@@ -1,0 +1,81 @@
+{
+  "roots": {
+    "bookmark_bar": {
+      "name": "Bookmarks bar",
+      "type": "folder",
+      "children": [
+        {
+          "name": "Research",
+          "type": "folder",
+          "children": [
+            {
+              "name": "OpenAI Docs",
+              "type": "url",
+              "url": "https://platform.openai.com/docs/overview",
+              "date_added": "13380000000000000"
+            },
+            {
+              "name": "OpenAI Docs",
+              "type": "url",
+              "url": "https://platform.openai.com/docs/overview",
+              "date_added": "13380000000000001"
+            },
+            {
+              "name": "Fast Notes",
+              "type": "url",
+              "url": "javascript:alert('not safe')",
+              "date_added": "13380000000000002"
+            }
+          ]
+        },
+        {
+          "name": "Classes",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    "other": {
+      "name": "Other bookmarks",
+      "type": "folder",
+      "children": [
+        {
+          "name": "Media",
+          "type": "folder",
+          "children": [
+            {
+              "name": "Local Trailer",
+              "type": "url",
+              "url": "file:///C:/trailers/movie.mp4",
+              "date_added": "13380000000000003"
+            },
+            {
+              "name": "UT Dallas",
+              "type": "url",
+              "url": "http://www.utdallas.edu",
+              "date_added": "13380000000000004"
+            }
+          ]
+        }
+      ]
+    },
+    "synced": {
+      "name": "Mobile bookmarks",
+      "type": "folder",
+      "children": [
+        {
+          "name": "Saved Reads",
+          "type": "folder",
+          "children": [
+            {
+              "name": "OpenAI Docs",
+              "type": "url",
+              "url": "https://platform.openai.com/docs/overview#models",
+              "date_added": "13380000000000005"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

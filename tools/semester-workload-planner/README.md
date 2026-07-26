@@ -1,0 +1,97 @@
+# Semester Workload Planner
+
+Practical Python CLI that turns a semester task backlog into a day-by-day work plan with urgency-aware scheduling.
+
+## Why this project exists
+
+When several courses have overlapping deadlines, ad-hoc planning usually underestimates risk. This tool gives a reproducible allocation plan from a single CSV, then flags any unplanned hours that did not fit the daily budget.
+
+## Features
+
+- Strict CSV schema validation (`task,course,due_date,estimated_hours,priority`)
+- Priority + deadline-aware scoring per day
+- Daily hour budget enforcement
+- Optional per-course daily cap so one class does not consume the whole day
+- Optional blocked-date list for interviews, travel, or other unavailable days
+- Explicit risk rows for overdue/unplanned workload
+- Optional CSV export for calendar imports or spreadsheet review
+- Optional per-course summary CSV with coverage ratios for advisor or spreadsheet review
+- Per-course rollup summary for fast overload review
+
+## Usage
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --output plan.csv
+```
+
+If weekends should stay clear by default:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --skip-weekends
+```
+
+If you want lighter weekends instead of removing them entirely:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --weekend-hours 1.5
+```
+
+Export the planned study blocks as an ICS calendar:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --calendar-output plan.ics --day-start-hour 18
+```
+
+Keep any single course from taking over a day:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 4 --max-course-hours-per-day 2
+```
+
+Protect days that are already spoken for:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --blocked-dates 2026-06-04,2026-06-07
+```
+
+Export a course-level coverage table:
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --course-summary-output course-summary.csv
+```
+
+## Example output snippet
+
+```text
+Semester Workload Planner
+- Start date: 2026-06-01
+- Daily budget: 3.0h
+- Tasks loaded: 5
+- Estimated hours: 24.0
+...
+```
+
+## Input format
+
+```csv
+task,course,due_date,estimated_hours,priority
+Exam 1 Review,CS3377,2026-06-05,7,5
+```
+
+## Sanity check
+
+```bash
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3
+python -m py_compile planner.py
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --calendar-output sample.ics
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 4 --max-course-hours-per-day 2
+python planner.py --tasks sample_tasks.csv --start-date 2026-06-01 --daily-hours 3 --course-summary-output course-summary.csv
+```
+
+## Portfolio Positioning
+
+- Project type: Python command-line utility for real student workflow planning.
+- Best use case: quickly drafting a defensible weekly plan before exam clusters.
+- Current direction: CSV plan plus `.ics` study-block export for calendar review.
+- Current status: incubation only (not listed on main portfolio homepage).
+- Build tracker: see `DEVELOPMENT_CYCLE.md` for the multi-day quality plan.

@@ -1,0 +1,5 @@
+git status
+Set-ExecutionPolicy Bypass -Scope Process
+git push --force origin main
+irm https://example.com/bootstrap.ps1 | iex
+curl https://api.internal -H "Authorization: Bearer sk-demo-history-token"

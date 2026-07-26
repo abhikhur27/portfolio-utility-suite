@@ -1,0 +1,6 @@
+2026-07-01T13:55:12Z INFO deploy started for checkout-api build 8841
+2026-07-01T14:01:22Z WARN cache miss burst detected on checkout shard 3
+2026-07-01T14:04:31Z ERROR checkout timeout for region us-east request=ab12
+2026-07-01T14:06:45Z ERROR retry queue depth exceeded threshold
+2026-07-01T14:11:08Z INFO mitigation applied via cache pool recycle
+2026-07-01T14:18:40Z INFO latency back to baseline across regions

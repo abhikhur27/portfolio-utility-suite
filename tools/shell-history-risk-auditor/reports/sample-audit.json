@@ -1,0 +1,47 @@
+{
+  "files_scanned": 1,
+  "commands_scanned": 5,
+  "totals": {
+    "high": 2,
+    "medium": 1,
+    "low": 1
+  },
+  "findings": [
+    {
+      "level": "high",
+      "label": "remote script execution",
+      "reason": "Downloads are being piped straight into a shell or expression evaluator.",
+      "command": "irm https://example.com/bootstrap.ps1 | iex",
+      "source_path": "examples\\ConsoleHost_history.txt",
+      "shell": "powershell",
+      "line_number": 4
+    },
+    {
+      "level": "high",
+      "label": "secret-like token",
+      "reason": "Command contains a token- or credential-like value that should not live in shell history.",
+      "command": "curl https://api.internal -H \"Authorization: Bearer sk-demo-history-token\"",
+      "source_path": "examples\\ConsoleHost_history.txt",
+      "shell": "powershell",
+      "line_number": 5
+    },
+    {
+      "level": "medium",
+      "label": "history-rewriting git command",
+      "reason": "Command rewrites git history or force-pushes a branch.",
+      "command": "git push --force origin main",
+      "source_path": "examples\\ConsoleHost_history.txt",
+      "shell": "powershell",
+      "line_number": 3
+    },
+    {
+      "level": "low",
+      "label": "safety bypass",
+      "reason": "Command weakens an execution or file-permission safety boundary.",
+      "command": "Set-ExecutionPolicy Bypass -Scope Process",
+      "source_path": "examples\\ConsoleHost_history.txt",
+      "shell": "powershell",
+      "line_number": 2
+    }
+  ]
+}

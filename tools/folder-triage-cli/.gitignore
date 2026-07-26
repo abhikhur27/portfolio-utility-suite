@@ -1,0 +1,6 @@
+folder-triage-cli
+folder-triage-cli.exe
+*.obj
+*.ilk
+*.pdb
+reports/

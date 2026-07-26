@@ -1,0 +1,11 @@
+**/target/
+**/bin/
+**/obj/
+**/__pycache__/
+**/.pytest_cache/
+**/node_modules/
+**/artifacts/
+*.exe
+*.pdb
+*.class
+*.jar

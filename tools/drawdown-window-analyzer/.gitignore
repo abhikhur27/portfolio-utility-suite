@@ -1,0 +1,6 @@
+drawdown-window-analyzer
+drawdown-window-analyzer.exe
+*.obj
+*.pdb
+reports/*.md
+reports/*.json
