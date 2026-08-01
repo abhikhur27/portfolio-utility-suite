@@ -42,15 +42,42 @@ The point of this repo is focus: improve installability, shared testing, shared 
 
 - `tools/<tool-name>/`: original tool source, README, and samples.
 - `tool-manifest.json`: machine-readable catalog for future launchers, docs, and CI.
+- `suite.ps1`: root launcher for listing, inspecting, running, and checking tools.
+- `scripts/check.ps1`: shared verification entrypoint across the suite.
 - `docs/autopilot-prompt.md`: replacement automation prompt focused on extended work.
+
+## Root Workflow
+
+List the suite catalog:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action list
+```
+
+Show one tool's metadata:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action info -Tool trace-budget-auditor
+```
+
+Run a tool through the shared launcher:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action run -Tool trace-budget-auditor -ArgumentLine '--input sample_traces.csv'
+```
+
+Check the whole suite or one tool:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -Tool deadline-calendar-builder
+```
 
 ## Near-Term Consolidation Plan
 
-1. Add a shared `scripts/check.ps1` that runs syntax and smoke checks per stack.
-2. Add a root launcher that can list tools and delegate to each tool's native entrypoint.
-3. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
-4. Add CI for the tools that can run without Windows-only APIs.
-5. Decide which older standalone repos should stay archived publicly and which should redirect here.
+1. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
+2. Add CI for the tools that can run without Windows-only APIs.
+3. Decide which older standalone repos should stay archived publicly and which should redirect here.
 
 ## Portfolio Positioning
 
