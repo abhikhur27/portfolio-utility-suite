@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$manifest = Get-Content (Join-Path $repoRoot "tool-manifest.json") | ConvertFrom-Json
+. (Join-Path $repoRoot "scripts\common.ps1")
+$manifest = Get-SuiteManifest -RepoRoot $repoRoot
 
 if ($Tool) {
     $manifest = $manifest | Where-Object { $_.name -eq $Tool }
@@ -157,10 +158,10 @@ foreach ($toolRecord in $manifest) {
                 $detail = "javac passed"
             }
             "cpp" {
-                $compiler = Get-Command g++ -ErrorAction SilentlyContinue
+                $compiler = Resolve-CppCompilerInvocation
                 if (-not $compiler) {
                     $status = "SKIP"
-                    $detail = "g++ not installed"
+                    $detail = "No supported C++ compiler found (g++ or zig)"
                     break
                 }
                 $source = Join-Path $toolPath "main.cpp"
@@ -170,11 +171,14 @@ foreach ($toolRecord in $manifest) {
                 $artifactDir = Join-Path $toolPath "artifacts"
                 $binaryPath = Join-Path $artifactDir $toolRecord.name
                 New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-                $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath $compiler.Source -Arguments @($source, "-std=c++17", "-O2", "-o", $binaryPath) -WorkingDirectory $toolPath
+                $compileArgs = @()
+                $compileArgs += $compiler.Arguments
+                $compileArgs += @($source, "-std=c++17", "-O2", "-o", $binaryPath)
+                $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath $compiler.FilePath -Arguments $compileArgs -WorkingDirectory $toolPath
                 if ($exitCode -ne 0) {
-                    throw "g++ build failed"
+                    throw "$($compiler.Label) build failed"
                 }
-                $detail = "g++ build passed"
+                $detail = "$($compiler.Label) build passed"
             }
             default {
                 throw "Unsupported stack '$($toolRecord.stack)'"

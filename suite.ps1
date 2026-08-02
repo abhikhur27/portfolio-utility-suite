@@ -1,21 +1,19 @@
 param(
-    [ValidateSet("list", "info", "run", "check")]
+    [ValidateSet("list", "info", "run", "check", "doctor")]
     [string]$Action = "list",
     [string]$Tool,
     [string[]]$ToolArgs = @(),
-    [string]$ArgumentLine
+    [string]$ArgumentLine,
+    [ValidateSet("table", "json", "markdown")]
+    [string]$DoctorFormat = "table",
+    [string]$OutputPath
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$manifestPath = Join-Path $repoRoot "tool-manifest.json"
-
-if (-not (Test-Path $manifestPath)) {
-    throw "Could not find tool-manifest.json at $manifestPath"
-}
-
-$manifest = Get-Content $manifestPath | ConvertFrom-Json
+. (Join-Path $repoRoot "scripts\common.ps1")
+$manifest = Get-SuiteManifest -RepoRoot $repoRoot
 
 function Get-ToolRecord {
     param([string]$Name)
@@ -129,9 +127,9 @@ function Invoke-Tool {
                 & java -cp (Join-Path $toolPath "src") "DatasetSplitAuditor" @Arguments
             }
             "cpp" {
-                $compiler = Get-Command g++ -ErrorAction SilentlyContinue
+                $compiler = Resolve-CppCompilerInvocation
                 if (-not $compiler) {
-                    throw "g++ is required to run C++ tools but is not installed."
+                    throw "A C++ compiler is required to run C++ tools. Install g++ or zig."
                 }
 
                 $source = Join-Path $toolPath "main.cpp"
@@ -142,12 +140,20 @@ function Invoke-Tool {
                 }
 
                 New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-                & $compiler.Source $source "-std=c++17" "-O2" "-o" $binaryPath
+                $compileArgs = @()
+                $compileArgs += $compiler.Arguments
+                $compileArgs += @($source, "-std=c++17", "-O2", "-o", $binaryPath)
+                & $compiler.FilePath @compileArgs
                 if ($LASTEXITCODE -ne 0) {
                     exit $LASTEXITCODE
                 }
 
-                & "$binaryPath.exe" @Arguments
+                $runnableBinary = if (Test-Path "$binaryPath.exe") { "$binaryPath.exe" } elseif (Test-Path $binaryPath) { $binaryPath } else { $null }
+                if (-not $runnableBinary) {
+                    throw "Compiled C++ artifact not found at $binaryPath or $binaryPath.exe"
+                }
+
+                & $runnableBinary @Arguments
             }
             default {
                 throw "Unsupported stack '$($Record.stack)' for $($Record.name)"
@@ -205,6 +211,47 @@ switch ($Action) {
         }
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
+        }
+    }
+    "doctor" {
+        $report = Get-SuiteDoctorReport -Manifest $manifest -RepoRoot $repoRoot
+
+        switch ($DoctorFormat) {
+            "json" {
+                $content = $report | ConvertTo-Json -Depth 6
+            }
+            "markdown" {
+                $content = Convert-DoctorReportToMarkdown -Report $report
+            }
+            default {
+                Write-Host "Portfolio Utility Suite Doctor"
+                Write-Host "Ready tools: $($report.Summary.ReadyToolCount) / $($report.Summary.ToolCount)"
+                Write-Host ""
+                $report.Toolchains | Sort-Object Stack | Format-Table Stack, Available, Command, Version, Detail -AutoSize
+                Write-Host ""
+                $report.Tools | Sort-Object Tool | Format-Table Tool, Stack, Runnable, Runtime, Detail -AutoSize
+            }
+        }
+
+        if ($DoctorFormat -ne "table") {
+            if ($OutputPath) {
+                $parent = Split-Path -Parent $OutputPath
+                if ($parent) {
+                    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+                }
+                Set-Content -Path $OutputPath -Value $content
+                Write-Host "Wrote doctor report to $OutputPath"
+            } else {
+                $content
+            }
+        } elseif ($OutputPath) {
+            $markdown = Convert-DoctorReportToMarkdown -Report $report
+            $parent = Split-Path -Parent $OutputPath
+            if ($parent) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+            Set-Content -Path $OutputPath -Value $markdown
+            Write-Host "Wrote doctor report to $OutputPath"
         }
     }
 }

@@ -71,6 +71,15 @@ Check the whole suite or one tool:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -Tool deadline-calendar-builder
+
+Inspect environment readiness across every stack in the suite:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action doctor
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action doctor -DoctorFormat markdown -OutputPath .\docs\doctor-report.md
+```
+
+The doctor report is useful before onboarding to the repo on a new machine because it shows which runtimes are present, which command will be used for each stack, and which tools are currently runnable. C++ tools now fall back to `zig c++` automatically when `g++` is not installed, which matches the Windows-first toolchain already used elsewhere in this workspace.
 ```
 
 ## Near-Term Consolidation Plan
