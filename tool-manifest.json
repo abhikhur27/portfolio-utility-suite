@@ -1,31 +1,207 @@
 [
-  { "name": "bookmark-health-brief", "stack": "python", "path": "tools/bookmark-health-brief", "entrypoint": "python bookmark_health_brief.py" },
-  { "name": "build-failure-brief", "stack": "python", "path": "tools/build-failure-brief", "entrypoint": "python build_failure_brief.py" },
-  { "name": "calendar-conflict-scout", "stack": "rust", "path": "tools/calendar-conflict-scout", "entrypoint": "cargo run --" },
-  { "name": "change-risk-sentry", "stack": "rust", "path": "tools/change-risk-sentry", "entrypoint": "cargo run --" },
-  { "name": "citation-gap-auditor", "stack": "python", "path": "tools/citation-gap-auditor", "entrypoint": "python auditor.py" },
-  { "name": "correlation-regime-brief", "stack": "python", "path": "tools/correlation-regime-brief", "entrypoint": "python correlation_regime_brief.py" },
-  { "name": "course-grade-allocator", "stack": "python", "path": "tools/course-grade-allocator", "entrypoint": "python grade_allocator.py" },
-  { "name": "dataset-split-auditor", "stack": "java", "path": "tools/dataset-split-auditor", "entrypoint": "javac src/DatasetSplitAuditor.java && java -cp src DatasetSplitAuditor" },
-  { "name": "deadline-calendar-builder", "stack": "node", "path": "tools/deadline-calendar-builder", "entrypoint": "node cli.js" },
-  { "name": "drawdown-window-analyzer", "stack": "cpp", "path": "tools/drawdown-window-analyzer", "entrypoint": "g++ main.cpp -std=c++17 -O2 -o artifacts/drawdown-window-analyzer && artifacts/drawdown-window-analyzer" },
-  { "name": "exam-week-brief", "stack": "rust", "path": "tools/exam-week-brief", "entrypoint": "cargo run --" },
-  { "name": "focus-window-audit", "stack": "dotnet", "path": "tools/focus-window-audit", "entrypoint": "dotnet run --" },
-  { "name": "folder-triage-cli", "stack": "cpp", "path": "tools/folder-triage-cli", "entrypoint": "g++ main.cpp -std=c++17 -O2 -o folder-triage-cli && ./folder-triage-cli" },
-  { "name": "listener-surface-auditor", "stack": "go", "path": "tools/listener-surface-auditor", "entrypoint": "go run ." },
-  { "name": "log-window-extractor", "stack": "python", "path": "tools/log-window-extractor", "entrypoint": "python log_window_extractor.py" },
-  { "name": "options-payoff-grid", "stack": "python", "path": "tools/options-payoff-grid", "entrypoint": "python options_payoff_grid.py" },
-  { "name": "path-shadow-auditor", "stack": "powershell", "path": "tools/path-shadow-auditor", "entrypoint": "powershell -ExecutionPolicy Bypass -File path-shadow-auditor.ps1" },
-  { "name": "pdf-annotation-digest", "stack": "python", "path": "tools/pdf-annotation-digest", "entrypoint": "python pdf_annotation_digest.py" },
-  { "name": "semester-workload-planner", "stack": "python", "path": "tools/semester-workload-planner", "entrypoint": "python planner.py" },
-  { "name": "shell-history-risk-auditor", "stack": "rust", "path": "tools/shell-history-risk-auditor", "entrypoint": "cargo run --" },
-  { "name": "shortcut-target-auditor", "stack": "powershell", "path": "tools/shortcut-target-auditor", "entrypoint": "powershell -ExecutionPolicy Bypass -File shortcut-target-auditor.ps1" },
-  { "name": "syllabus-diff-brief", "stack": "rust", "path": "tools/syllabus-diff-brief", "entrypoint": "cargo run --" },
-  { "name": "trace-budget-auditor", "stack": "python", "path": "tools/trace-budget-auditor", "entrypoint": "python auditor.py" },
-  { "name": "trade-journal-normalizer", "stack": "python", "path": "tools/trade-journal-normalizer", "entrypoint": "python trade_journal_normalizer.py" },
-  { "name": "vault-link-auditor", "stack": "python", "path": "tools/vault-link-auditor", "entrypoint": "python auditor.py" },
-  { "name": "wifi-profile-auditor", "stack": "rust", "path": "tools/wifi-profile-auditor", "entrypoint": "cargo run --" },
-  { "name": "windows-autostart-auditor", "stack": "dotnet", "path": "tools/windows-autostart-auditor", "entrypoint": "dotnet run --" },
-  { "name": "workspace-branch-watch", "stack": "cpp", "path": "tools/workspace-branch-watch", "entrypoint": "g++ main.cpp -std=c++17 -O2 -o workspace-branch-watch && ./workspace-branch-watch" },
-  { "name": "zip-risk-auditor", "stack": "rust", "path": "tools/zip-risk-auditor", "entrypoint": "cargo run --" }
+  {
+    "name": "bookmark-health-brief",
+    "stack": "python",
+    "path": "tools/bookmark-health-brief",
+    "entrypoint": "python bookmark_health_brief.py",
+    "smoke": { "arguments": ["--input", "samples/sample-bookmarks.json"], "description": "Audit the bundled bookmark export without network checks." }
+  },
+  {
+    "name": "build-failure-brief",
+    "stack": "python",
+    "path": "tools/build-failure-brief",
+    "entrypoint": "python build_failure_brief.py",
+    "smoke": { "arguments": ["--help"], "description": "Load the CLI and render its usage contract." }
+  },
+  {
+    "name": "calendar-conflict-scout",
+    "stack": "rust",
+    "path": "tools/calendar-conflict-scout",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["--help"], "description": "Build the CLI and validate its Clap command surface." }
+  },
+  {
+    "name": "change-risk-sentry",
+    "stack": "rust",
+    "path": "tools/change-risk-sentry",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["../.."], "description": "Analyze the suite repository's current worktree." }
+  },
+  {
+    "name": "citation-gap-auditor",
+    "stack": "python",
+    "path": "tools/citation-gap-auditor",
+    "entrypoint": "python auditor.py",
+    "smoke": { "arguments": ["--input", "samples"], "description": "Audit the bundled research-note fixture." }
+  },
+  {
+    "name": "correlation-regime-brief",
+    "stack": "python",
+    "path": "tools/correlation-regime-brief",
+    "entrypoint": "python correlation_regime_brief.py",
+    "smoke": { "arguments": ["--input", "sample_returns.csv", "--anchor", "SPY", "--window", "10"], "description": "Analyze the bundled market-return series." }
+  },
+  {
+    "name": "course-grade-allocator",
+    "stack": "python",
+    "path": "tools/course-grade-allocator",
+    "entrypoint": "python grade_allocator.py",
+    "smoke": { "arguments": ["--input", "sample_gradebook.csv", "--pending-average", "88"], "description": "Calculate a plan from the bundled gradebook." }
+  },
+  {
+    "name": "dataset-split-auditor",
+    "stack": "java",
+    "path": "tools/dataset-split-auditor",
+    "entrypoint": "javac src/DatasetSplitAuditor.java && java -cp src DatasetSplitAuditor",
+    "smoke": { "arguments": ["--train", "examples/train.csv", "--test", "examples/test.csv", "--validation", "examples/validation.csv"], "description": "Audit the bundled train, test, and validation splits." }
+  },
+  {
+    "name": "deadline-calendar-builder",
+    "stack": "node",
+    "path": "tools/deadline-calendar-builder",
+    "entrypoint": "node cli.js",
+    "smoke": { "arguments": ["./example.csv", "--out", "artifacts/smoke.ics", "--summary", "artifacts/smoke.md", "--timezone", "America/Chicago"], "description": "Build calendar and review artifacts from the sample deadlines." }
+  },
+  {
+    "name": "drawdown-window-analyzer",
+    "stack": "cpp",
+    "path": "tools/drawdown-window-analyzer",
+    "entrypoint": "g++ main.cpp -std=c++17 -O2 -o artifacts/drawdown-window-analyzer && artifacts/drawdown-window-analyzer",
+    "smoke": { "arguments": ["--self-test"], "description": "Run the built-in deterministic drawdown regression checks." }
+  },
+  {
+    "name": "exam-week-brief",
+    "stack": "rust",
+    "path": "tools/exam-week-brief",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["--input", "sample_exams.csv", "--today", "2026-12-10"], "description": "Build a study brief from the bundled exam schedule." }
+  },
+  {
+    "name": "focus-window-audit",
+    "stack": "dotnet",
+    "path": "tools/focus-window-audit",
+    "entrypoint": "dotnet run --",
+    "smoke": { "arguments": ["--demo"], "description": "Render the deterministic focus-session demo." }
+  },
+  {
+    "name": "folder-triage-cli",
+    "stack": "cpp",
+    "path": "tools/folder-triage-cli",
+    "entrypoint": "g++ main.cpp -std=c++17 -O2 -o folder-triage-cli && ./folder-triage-cli",
+    "smoke": { "arguments": [".", "--top", "3", "--stale-days", "0"], "description": "Scan the tool directory and rank a small result set." }
+  },
+  {
+    "name": "listener-surface-auditor",
+    "stack": "go",
+    "path": "tools/listener-surface-auditor",
+    "entrypoint": "go run .",
+    "smoke": { "arguments": ["--ignore-ports", "65535"], "description": "Inspect the local listener surface without writing reports." }
+  },
+  {
+    "name": "log-window-extractor",
+    "stack": "python",
+    "path": "tools/log-window-extractor",
+    "entrypoint": "python log_window_extractor.py",
+    "smoke": { "arguments": ["sample_logs/incident.log", "--anchor", "2026-07-01T14:05:00Z", "--before-minutes", "8", "--after-minutes", "10"], "description": "Extract the incident window from the bundled log." }
+  },
+  {
+    "name": "options-payoff-grid",
+    "stack": "python",
+    "path": "tools/options-payoff-grid",
+    "entrypoint": "python options_payoff_grid.py",
+    "smoke": { "arguments": ["--input", "sample_legs.csv", "--price-start", "70", "--price-end", "140", "--price-step", "10"], "description": "Evaluate the bundled multi-leg options position." }
+  },
+  {
+    "name": "path-shadow-auditor",
+    "stack": "powershell",
+    "path": "tools/path-shadow-auditor",
+    "entrypoint": "powershell -ExecutionPolicy Bypass -File path-shadow-auditor.ps1",
+    "smoke": { "arguments": ["-Command", "python,git,node", "-Scope", "Process"], "description": "Audit three core commands against the current process PATH." }
+  },
+  {
+    "name": "pdf-annotation-digest",
+    "stack": "python",
+    "path": "tools/pdf-annotation-digest",
+    "entrypoint": "python pdf_annotation_digest.py",
+    "smoke": { "arguments": ["sample_annotations.pdf", "--kind", "note"], "description": "Extract notes from the bundled annotated PDF." }
+  },
+  {
+    "name": "semester-workload-planner",
+    "stack": "python",
+    "path": "tools/semester-workload-planner",
+    "entrypoint": "python planner.py",
+    "smoke": { "arguments": ["--tasks", "sample_tasks.csv", "--start-date", "2026-06-01", "--daily-hours", "3"], "description": "Plan the bundled semester workload." }
+  },
+  {
+    "name": "shell-history-risk-auditor",
+    "stack": "rust",
+    "path": "tools/shell-history-risk-auditor",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["examples/ConsoleHost_history.txt"], "description": "Audit the bundled PowerShell history fixture." }
+  },
+  {
+    "name": "shortcut-target-auditor",
+    "stack": "powershell",
+    "path": "tools/shortcut-target-auditor",
+    "entrypoint": "powershell -ExecutionPolicy Bypass -File shortcut-target-auditor.ps1",
+    "smoke": { "arguments": ["-Roots", "."], "description": "Exercise shortcut discovery against the tool directory." }
+  },
+  {
+    "name": "syllabus-diff-brief",
+    "stack": "rust",
+    "path": "tools/syllabus-diff-brief",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["samples/syllabus-v1.txt", "samples/syllabus-v2.txt"], "description": "Compare the bundled syllabus policy fixtures." }
+  },
+  {
+    "name": "trace-budget-auditor",
+    "stack": "python",
+    "path": "tools/trace-budget-auditor",
+    "entrypoint": "python auditor.py",
+    "smoke": { "arguments": ["--input", "sample_traces.csv"], "description": "Audit the bundled request traces." }
+  },
+  {
+    "name": "trade-journal-normalizer",
+    "stack": "python",
+    "path": "tools/trade-journal-normalizer",
+    "entrypoint": "python trade_journal_normalizer.py",
+    "smoke": { "arguments": ["examples/sample_trades.csv", "--drop-duplicates"], "description": "Normalize the bundled broker export." }
+  },
+  {
+    "name": "vault-link-auditor",
+    "stack": "python",
+    "path": "tools/vault-link-auditor",
+    "entrypoint": "python auditor.py",
+    "smoke": { "arguments": ["--root", "example_vault"], "description": "Audit the bundled Obsidian-style vault." }
+  },
+  {
+    "name": "wifi-profile-auditor",
+    "stack": "rust",
+    "path": "tools/wifi-profile-auditor",
+    "entrypoint": "cargo run --",
+    "platform": "windows",
+    "smoke": { "arguments": ["--min-risk", "100"], "description": "Read saved Windows Wi-Fi profiles and apply a high-risk filter." }
+  },
+  {
+    "name": "windows-autostart-auditor",
+    "stack": "dotnet",
+    "path": "tools/windows-autostart-auditor",
+    "entrypoint": "dotnet run --",
+    "platform": "windows",
+    "smoke": { "arguments": ["--min-risk", "100"], "description": "Inspect Windows autostart surfaces with a high-risk filter." }
+  },
+  {
+    "name": "workspace-branch-watch",
+    "stack": "cpp",
+    "path": "tools/workspace-branch-watch",
+    "entrypoint": "g++ main.cpp -std=c++17 -O2 -o workspace-branch-watch && ./workspace-branch-watch",
+    "smoke": { "arguments": ["../..", "--stale-days", "0", "--exclude-dir", "target", "--exclude-dir", "node_modules"], "description": "Scan the suite repository as a one-repo workspace." }
+  },
+  {
+    "name": "zip-risk-auditor",
+    "stack": "rust",
+    "path": "tools/zip-risk-auditor",
+    "entrypoint": "cargo run --",
+    "smoke": { "arguments": ["--help"], "description": "Build the CLI and render its usage contract." }
+  }
 ]

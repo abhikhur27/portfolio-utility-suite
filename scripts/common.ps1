@@ -12,7 +12,210 @@ function Get-SuiteManifest {
         throw "Could not find tool-manifest.json at $manifestPath"
     }
 
-    return Get-Content $manifestPath | ConvertFrom-Json
+    $manifest = Get-Content $manifestPath | ConvertFrom-Json
+    Test-SuiteManifest -Manifest $manifest -RepoRoot $RepoRoot
+    return $manifest
+}
+
+function Test-SuiteManifest {
+    param(
+        [object[]]$Manifest,
+        [string]$RepoRoot
+    )
+
+    $supportedStacks = @("python", "node", "rust", "dotnet", "go", "java", "powershell", "cpp")
+    $supportedPlatforms = @("all", "windows")
+    $errors = New-Object System.Collections.Generic.List[string]
+    $names = @{}
+
+    foreach ($record in @($Manifest)) {
+        $name = [string]$record.name
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            $errors.Add("A manifest record is missing its name.")
+            continue
+        }
+        if ($names.ContainsKey($name)) {
+            $errors.Add("Duplicate tool name '$name'.")
+        }
+        $names[$name] = $true
+
+        if ($supportedStacks -notcontains [string]$record.stack) {
+            $errors.Add("$name uses unsupported stack '$($record.stack)'.")
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$record.entrypoint)) {
+            $errors.Add("$name is missing its entrypoint.")
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$record.path) -or [System.IO.Path]::IsPathRooted([string]$record.path)) {
+            $errors.Add("$name must use a relative tool path.")
+        } else {
+            $toolPath = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $record.path))
+            $rootPath = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+            if (-not $toolPath.StartsWith($rootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $errors.Add("$name points outside the suite repository.")
+            } elseif (-not (Test-Path -LiteralPath $toolPath -PathType Container)) {
+                $errors.Add("$name tool path does not exist: $($record.path)")
+            }
+        }
+
+        $platform = if ($record.PSObject.Properties.Name -contains "platform") { [string]$record.platform } else { "all" }
+        if ($supportedPlatforms -notcontains $platform) {
+            $errors.Add("$name uses unsupported platform '$platform'.")
+        }
+        if (-not ($record.PSObject.Properties.Name -contains "smoke")) {
+            $errors.Add("$name is missing smoke-check metadata.")
+        } else {
+            if (-not ($record.smoke.PSObject.Properties.Name -contains "arguments")) {
+                $errors.Add("$name smoke metadata is missing arguments.")
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$record.smoke.description)) {
+                $errors.Add("$name smoke metadata is missing a description.")
+            }
+        }
+    }
+
+    if ($errors.Count -gt 0) {
+        throw "Invalid tool-manifest.json:`n- $($errors -join "`n- ")"
+    }
+}
+
+function Test-SuitePlatformSupport {
+    param($Record)
+
+    $platform = if ($Record.PSObject.Properties.Name -contains "platform") { [string]$Record.platform } else { "all" }
+    if ($platform -eq "all") {
+        return $true
+    }
+    return $platform -eq "windows" -and $env:OS -eq "Windows_NT"
+}
+
+function Resolve-SuiteToolArguments {
+    param(
+        [string[]]$ArgsArray,
+        [string]$ArgsLine
+    )
+
+    if ($ArgsLine) {
+        $matches = [regex]::Matches($ArgsLine, '''[^'']*''|"[^\"]*"|\S+')
+        return @(
+            $matches | ForEach-Object {
+                $value = $_.Value
+                if (
+                    ($value.StartsWith("'") -and $value.EndsWith("'")) -or
+                    ($value.StartsWith('"') -and $value.EndsWith('"'))
+                ) {
+                    $value.Substring(1, $value.Length - 2)
+                } else {
+                    $value
+                }
+            }
+        )
+    }
+
+    return @($ArgsArray)
+}
+
+function Get-SuitePythonEntrypoint {
+    param($Record, [string]$ToolPath)
+
+    $entryTokens = @($Record.entrypoint -split "\s+")
+    foreach ($token in $entryTokens) {
+        if ($token -like "*.py" -and (Test-Path (Join-Path $ToolPath $token))) {
+            return $token
+        }
+    }
+
+    $candidates = @(Get-ChildItem -Path $ToolPath -Filter *.py -File |
+        Where-Object { $_.Name -notlike "test_*.py" -and $_.Name -notlike "*_test.py" } |
+        Sort-Object Name)
+    if ($candidates.Count -eq 0) {
+        throw "No Python entrypoint found for $($Record.name)"
+    }
+
+    return $candidates[0].Name
+}
+
+function Invoke-SuiteTool {
+    param(
+        $Record,
+        [string]$RepoRoot,
+        [string[]]$Arguments = @()
+    )
+
+    if (-not (Test-SuitePlatformSupport -Record $Record)) {
+        throw "$($Record.name) only supports platform '$($Record.platform)'."
+    }
+
+    $toolPath = Join-Path $RepoRoot $Record.path
+    Push-Location $toolPath
+    try {
+        $global:LASTEXITCODE = 0
+        switch ($Record.stack) {
+            "python" {
+                $script = Get-SuitePythonEntrypoint -Record $Record -ToolPath $toolPath
+                & python $script @Arguments | Out-Host
+            }
+            "node" {
+                & node "cli.js" @Arguments | Out-Host
+            }
+            "rust" {
+                & cargo run -- @Arguments | Out-Host
+            }
+            "dotnet" {
+                $project = Get-ChildItem -Path $toolPath -Filter *.csproj -File | Select-Object -First 1
+                if (-not $project) {
+                    throw "No .csproj file found for $($Record.name)"
+                }
+                & dotnet run --project $project.FullName -- @Arguments | Out-Host
+            }
+            "powershell" {
+                $script = Get-ChildItem -Path $toolPath -Filter *.ps1 -File | Select-Object -First 1
+                if (-not $script) {
+                    throw "No PowerShell script found for $($Record.name)"
+                }
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $script.FullName @Arguments | Out-Host
+            }
+            "go" {
+                & go run . @Arguments | Out-Host
+            }
+            "java" {
+                $source = Join-Path $toolPath "src\DatasetSplitAuditor.java"
+                & javac $source | Out-Host
+                if ($LASTEXITCODE -eq 0) {
+                    & java -cp (Join-Path $toolPath "src") "DatasetSplitAuditor" @Arguments | Out-Host
+                }
+            }
+            "cpp" {
+                $compiler = Resolve-CppCompilerInvocation
+                if (-not $compiler) {
+                    throw "A C++ compiler is required to run C++ tools. Install g++ or zig."
+                }
+                $source = Join-Path $toolPath "main.cpp"
+                $artifactDir = Join-Path $toolPath "artifacts"
+                $binaryName = if ($env:OS -eq "Windows_NT") { "$($Record.name).exe" } else { $Record.name }
+                $binaryPath = Join-Path $artifactDir $binaryName
+                New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+                $compileArgs = @($compiler.Arguments) + @($source, "-std=c++17", "-O2", "-o", $binaryPath)
+                & $compiler.FilePath @compileArgs | Out-Host
+                if ($LASTEXITCODE -eq 0) {
+                    if (-not (Test-Path $binaryPath)) {
+                        throw "Compiled C++ artifact not found for $($Record.name)."
+                    }
+                    & $binaryPath @Arguments | Out-Host
+                }
+            }
+            default {
+                throw "Unsupported stack '$($Record.stack)' for $($Record.name)"
+            }
+        }
+
+        $commandExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        if ($commandExitCode -ne 0) {
+            throw "$($Record.name) exited with code $commandExitCode."
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 function Get-ToolCommand {
@@ -213,14 +416,19 @@ function Get-SuiteDoctorReport {
     $toolRows = foreach ($tool in ($Manifest | Sort-Object name)) {
         $toolPath = Join-Path $RepoRoot $tool.path
         $runtime = $stackIndex[$tool.stack]
+        $platformSupported = Test-SuitePlatformSupport -Record $tool
         [pscustomobject]@{
             Tool = $tool.name
             Stack = $tool.stack
-            Runnable = [bool]($runtime -and $runtime.Available -and (Test-Path $toolPath))
+            Platform = if ($tool.PSObject.Properties.Name -contains "platform") { $tool.platform } else { "all" }
+            Runnable = [bool]($platformSupported -and $runtime -and $runtime.Available -and (Test-Path $toolPath))
             Runtime = if ($runtime) { $runtime.Command } else { $null }
             ToolPath = $tool.path
+            SmokeCheck = if ($tool.PSObject.Properties.Name -contains "smoke") { "configured" } else { "missing" }
             Detail = if (-not (Test-Path $toolPath)) {
                 "Missing tool path"
+            } elseif (-not $platformSupported) {
+                "Unsupported on this host"
             } elseif (-not $runtime.Available) {
                 $runtime.Detail
             } else {
@@ -240,6 +448,7 @@ function Get-SuiteDoctorReport {
             ReadyToolCount = $readyCount
             BlockedToolCount = $blockedCount
             StackCount = $stackStatuses.Count
+            SmokeCheckCount = @($toolRows | Where-Object { $_.SmokeCheck -eq "configured" }).Count
         }
         Toolchains = $stackStatuses
         Tools = $toolRows
@@ -256,6 +465,7 @@ function Convert-DoctorReportToMarkdown {
     $lines.Add("- Repo root: $($Report.RepoRoot)")
     $lines.Add("- Ready tools: $($Report.Summary.ReadyToolCount) / $($Report.Summary.ToolCount)")
     $lines.Add("- Blocked tools: $($Report.Summary.BlockedToolCount)")
+    $lines.Add("- Smoke checks configured: $($Report.Summary.SmokeCheckCount) / $($Report.Summary.ToolCount)")
     $lines.Add("")
     $lines.Add("## Toolchains")
     $lines.Add("")
@@ -267,12 +477,11 @@ function Convert-DoctorReportToMarkdown {
     $lines.Add("")
     $lines.Add("## Tool Readiness")
     $lines.Add("")
-    $lines.Add("| Tool | Stack | Runnable | Runtime | Detail |")
-    $lines.Add("| --- | --- | --- | --- | --- |")
+    $lines.Add("| Tool | Stack | Platform | Runnable | Runtime | Smoke check | Detail |")
+    $lines.Add("| --- | --- | --- | --- | --- | --- | --- |")
     foreach ($row in $Report.Tools) {
-        $lines.Add("| $($row.Tool) | $($row.Stack) | $(if ($row.Runnable) { 'yes' } else { 'no' }) | $($row.Runtime) | $($row.Detail) |")
+        $lines.Add("| $($row.Tool) | $($row.Stack) | $($row.Platform) | $(if ($row.Runnable) { 'yes' } else { 'no' }) | $($row.Runtime) | $($row.SmokeCheck) | $($row.Detail) |")
     }
 
     return ($lines -join [Environment]::NewLine)
 }
-

@@ -1,0 +1,5 @@
+CS 4348 Operating Systems
+Attendance is required and counts for 5% of the final grade.
+Late work is accepted for 24 hours with a 20% penalty.
+The midterm is worth 25% of the final grade.
+The final exam is scheduled for December 16.

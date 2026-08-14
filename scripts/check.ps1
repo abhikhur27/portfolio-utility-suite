@@ -1,5 +1,7 @@
 param(
-    [string]$Tool
+    [string]$Tool,
+    [ValidateSet("build", "smoke")]
+    [string]$Mode = "build"
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,10 +70,28 @@ foreach ($toolRecord in $manifest) {
         continue
     }
 
+    if (-not (Test-SuitePlatformSupport -Record $toolRecord)) {
+        $results.Add([pscustomobject]@{
+            Tool = $toolRecord.name
+            Stack = $toolRecord.stack
+            Status = "SKIP"
+            Detail = "Platform '$($toolRecord.platform)' is not available on this host"
+        })
+        continue
+    }
+
     try {
         $status = "PASS"
         $detail = $null
-        switch ($toolRecord.stack) {
+        if ($Mode -eq "smoke") {
+            $arguments = @($toolRecord.smoke.arguments | ForEach-Object { [string]$_ })
+            Write-Host "[$($toolRecord.name)] smoke: $($toolRecord.smoke.description)"
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            Invoke-SuiteTool -Record $toolRecord -RepoRoot $repoRoot -Arguments $arguments
+            $stopwatch.Stop()
+            $detail = "Runtime smoke passed in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s"
+        } else {
+            switch ($toolRecord.stack) {
             "python" {
                 $pythonFiles = Get-ChildItem -Path $toolPath -Filter *.py -File
                 foreach ($file in $pythonFiles) {
@@ -169,7 +189,8 @@ foreach ($toolRecord in $manifest) {
                     throw "Missing main.cpp"
                 }
                 $artifactDir = Join-Path $toolPath "artifacts"
-                $binaryPath = Join-Path $artifactDir $toolRecord.name
+                $binaryName = if ($env:OS -eq "Windows_NT") { "$($toolRecord.name).exe" } else { $toolRecord.name }
+                $binaryPath = Join-Path $artifactDir $binaryName
                 New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
                 $compileArgs = @()
                 $compileArgs += $compiler.Arguments
@@ -182,6 +203,7 @@ foreach ($toolRecord in $manifest) {
             }
             default {
                 throw "Unsupported stack '$($toolRecord.stack)'"
+            }
             }
         }
 
@@ -202,6 +224,8 @@ foreach ($toolRecord in $manifest) {
     }
 }
 
+Write-Host ""
+Write-Host "Portfolio Utility Suite $Mode results"
 $results | Sort-Object Tool | Format-Table -AutoSize
 
 $failed = @($results | Where-Object { $_.Status -eq "FAIL" })

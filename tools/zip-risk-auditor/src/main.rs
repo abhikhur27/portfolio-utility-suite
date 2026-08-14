@@ -53,7 +53,12 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let options = parse_args(env::args().skip(1).collect())?;
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        println!("{}", usage());
+        return Ok(());
+    }
+    let options = parse_args(args)?;
     let archives = collect_archives(&options.inputs)?;
     if archives.is_empty() {
         return Err("No .zip files were found in the selected inputs.".to_string());
@@ -72,7 +77,11 @@ fn run() -> Result<(), String> {
         right
             .risk_score
             .cmp(&left.risk_score)
-            .then_with(|| right.max_expansion_ratio.total_cmp(&left.max_expansion_ratio))
+            .then_with(|| {
+                right
+                    .max_expansion_ratio
+                    .total_cmp(&left.max_expansion_ratio)
+            })
             .then_with(|| left.archive_path.cmp(&right.archive_path))
     });
 
@@ -179,7 +188,6 @@ fn parse_args(args: Vec<String>) -> Result<CliOptions, String> {
                     return Err("--top must be at least 1.".to_string());
                 }
             }
-            "--help" | "-h" => return Err(usage()),
             unknown => return Err(format!("Unknown argument: {unknown}\n\n{}", usage())),
         }
         index += 1;
@@ -219,9 +227,8 @@ fn collect_archives(inputs: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
             continue;
         }
         if input.is_dir() {
-            walk_dir(input, &mut archives).map_err(|error| {
-                format!("Could not walk {}: {error}", input.display())
-            })?;
+            walk_dir(input, &mut archives)
+                .map_err(|error| format!("Could not walk {}: {error}", input.display()))?;
             continue;
         }
         return Err(format!("Input path does not exist: {}", input.display()));
@@ -254,9 +261,14 @@ fn analyze_archive(
     ratio_threshold: f64,
     total_size_threshold_mb: f64,
 ) -> Result<ArchiveFinding, String> {
-    let file = File::open(path).map_err(|error| format!("Could not open {}: {error}", path.display()))?;
-    let mut archive = ZipArchive::new(file)
-        .map_err(|error| format!("Could not read {} as a zip archive: {error}", path.display()))?;
+    let file =
+        File::open(path).map_err(|error| format!("Could not open {}: {error}", path.display()))?;
+    let mut archive = ZipArchive::new(file).map_err(|error| {
+        format!(
+            "Could not read {} as a zip archive: {error}",
+            path.display()
+        )
+    })?;
 
     let mut normalized_paths = HashMap::<String, usize>::new();
     let mut traversal_entries = 0usize;
@@ -268,9 +280,12 @@ fn analyze_archive(
     let mut total_compressed_bytes = 0u64;
 
     for index in 0..archive.len() {
-        let entry = archive
-            .by_index(index)
-            .map_err(|error| format!("Could not inspect entry {index} in {}: {error}", path.display()))?;
+        let entry = archive.by_index(index).map_err(|error| {
+            format!(
+                "Could not inspect entry {index} in {}: {error}",
+                path.display()
+            )
+        })?;
 
         if entry.is_dir() {
             continue;
@@ -298,7 +313,11 @@ fn analyze_archive(
         total_compressed_bytes += compressed;
         total_uncompressed_bytes += uncompressed;
         let ratio = if compressed == 0 {
-            if uncompressed == 0 { 1.0 } else { uncompressed as f64 }
+            if uncompressed == 0 {
+                1.0
+            } else {
+                uncompressed as f64
+            }
         } else {
             uncompressed as f64 / compressed as f64
         };
@@ -307,7 +326,10 @@ fn analyze_archive(
         }
     }
 
-    let duplicate_paths = normalized_paths.values().filter(|count| **count > 1).count();
+    let duplicate_paths = normalized_paths
+        .values()
+        .filter(|count| **count > 1)
+        .count();
     let archive_expansion_ratio = if total_compressed_bytes == 0 {
         if total_uncompressed_bytes == 0 {
             1.0
@@ -439,7 +461,10 @@ fn print_console(report: &AuditReport, top: usize) {
     println!("Archives scanned:   {}", report.archives_scanned);
     println!("Flagged archives:   {}", report.flagged_archives);
     println!("Ratio threshold:    {:.1}x", report.ratio_threshold);
-    println!("Size threshold:     {:.1} MB", report.total_size_threshold_mb);
+    println!(
+        "Size threshold:     {:.1} MB",
+        report.total_size_threshold_mb
+    );
     println!();
 
     if report.rows.is_empty() {
@@ -447,7 +472,10 @@ fn print_console(report: &AuditReport, top: usize) {
         return;
     }
 
-    println!("{:<4} {:<4} {:<6} {:<6} Archive", "Risk", "Trav", "Dup", "Exec");
+    println!(
+        "{:<4} {:<4} {:<6} {:<6} Archive",
+        "Risk", "Trav", "Dup", "Exec"
+    );
     println!("{}", "-".repeat(88));
     for row in report.rows.iter().take(top) {
         println!(
@@ -466,9 +494,18 @@ fn render_markdown(report: &AuditReport) -> String {
     let mut output = String::new();
     output.push_str("# Zip Risk Brief\n\n");
     output.push_str(&format!("- Generated: `{}`\n", report.generated_at));
-    output.push_str(&format!("- Archives scanned: `{}`\n", report.archives_scanned));
-    output.push_str(&format!("- Flagged archives: `{}`\n", report.flagged_archives));
-    output.push_str(&format!("- Ratio threshold: `{:.1}x`\n", report.ratio_threshold));
+    output.push_str(&format!(
+        "- Archives scanned: `{}`\n",
+        report.archives_scanned
+    ));
+    output.push_str(&format!(
+        "- Flagged archives: `{}`\n",
+        report.flagged_archives
+    ));
+    output.push_str(&format!(
+        "- Ratio threshold: `{:.1}x`\n",
+        report.ratio_threshold
+    ));
     output.push_str(&format!(
         "- Total size threshold: `{:.1} MB`\n\n",
         report.total_size_threshold_mb
@@ -528,7 +565,9 @@ fn iso_timestamp() -> String {
         .args(["-NoProfile", "-Command", "(Get-Date).ToString('o')"])
         .output()
     {
-        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
         _ => "unknown".to_string(),
     }
 }
@@ -548,7 +587,10 @@ mod tests {
 
     #[test]
     fn normalize_archive_path_removes_dot_segments() {
-        assert_eq!(normalize_archive_path("./docs//report.txt"), "docs/report.txt");
+        assert_eq!(
+            normalize_archive_path("./docs//report.txt"),
+            "docs/report.txt"
+        );
     }
 
     #[test]
@@ -584,9 +626,11 @@ mod tests {
         assert_eq!(finding.traversal_entries, 1);
         assert_eq!(finding.executable_entries, 1);
         assert_eq!(finding.nested_archives, 1);
-        assert!(finding
-            .signals
-            .iter()
-            .any(|signal| signal.contains("total uncompressed size")));
+        assert!(
+            finding
+                .signals
+                .iter()
+                .any(|signal| signal.contains("total uncompressed size"))
+        );
     }
 }

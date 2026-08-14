@@ -41,7 +41,7 @@ The point of this repo is focus: improve installability, shared testing, shared 
 ## Layout
 
 - `tools/<tool-name>/`: original tool source, README, and samples.
-- `tool-manifest.json`: machine-readable catalog for future launchers, docs, and CI.
+- `tool-manifest.json`: machine-readable catalog with stack, platform, entrypoint, and safe smoke-check metadata.
 - `suite.ps1`: root launcher for listing, inspecting, running, and checking tools.
 - `scripts/check.ps1`: shared verification entrypoint across the suite.
 - `docs/autopilot-prompt.md`: replacement automation prompt focused on extended work.
@@ -71,6 +71,16 @@ Check the whole suite or one tool:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -Tool deadline-calendar-builder
+```
+
+Compilation checks catch syntax and build failures. Runtime smoke checks go further by executing every tool against a bundled fixture, a safe local read-only workflow, or its CLI usage contract:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode smoke
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode smoke -Tool syllabus-diff-brief
+```
+
+Smoke commands are declared as argument arrays in `tool-manifest.json`; the checker always dispatches them through the same stack-aware runner used by `suite.ps1 -Action run`. This keeps verification aligned with the actual user path and avoids shell-evaluated command strings. Windows-only checks are identified in the manifest and skipped on unsupported hosts.
 
 Inspect environment readiness across every stack in the suite:
 
@@ -79,13 +89,12 @@ powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action doctor
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action doctor -DoctorFormat markdown -OutputPath .\docs\doctor-report.md
 ```
 
-The doctor report is useful before onboarding to the repo on a new machine because it shows which runtimes are present, which command will be used for each stack, and which tools are currently runnable. C++ tools now fall back to `zig c++` automatically when `g++` is not installed, which matches the Windows-first toolchain already used elsewhere in this workspace.
-```
+The doctor report is useful before onboarding to the repo on a new machine because it shows which runtimes are present, which command will be used for each stack, which tools are currently runnable, and whether each tool has a configured smoke check. C++ tools fall back to `zig c++` automatically when `g++` is not installed, which matches the Windows-first toolchain already used elsewhere in this workspace.
 
 ## Near-Term Consolidation Plan
 
-1. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
-2. Add CI for the tools that can run without Windows-only APIs.
+1. Add CI shards for the portable smoke checks without forcing Windows-only utilities onto unsupported runners.
+2. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
 3. Decide which older standalone repos should stay archived publicly and which should redirect here.
 
 ## Portfolio Positioning
