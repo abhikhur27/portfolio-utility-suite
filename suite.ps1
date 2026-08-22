@@ -4,6 +4,10 @@ param(
     [string]$Tool,
     [string[]]$ToolArgs = @(),
     [string]$ArgumentLine,
+    [ValidateSet("python", "node", "rust", "dotnet", "go", "java", "powershell", "cpp")]
+    [string]$Stack,
+    [ValidateSet("host", "portable", "windows")]
+    [string]$CheckShard = "host",
     [ValidateSet("build", "smoke")]
     [string]$CheckMode = "build",
     [ValidateSet("table", "json", "markdown")]
@@ -67,11 +71,10 @@ switch ($Action) {
     }
     "check" {
         $scriptPath = Join-Path $repoRoot "scripts\check.ps1"
-        if ($Tool) {
-            & $scriptPath -Tool $Tool -Mode $CheckMode
-        } else {
-            & $scriptPath -Mode $CheckMode
-        }
+        $checkParameters = @{ Mode = $CheckMode; Shard = $CheckShard }
+        if ($Tool) { $checkParameters.Tool = $Tool }
+        if ($Stack) { $checkParameters.Stack = $Stack }
+        & $scriptPath @checkParameters
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
         }
@@ -89,7 +92,7 @@ switch ($Action) {
                 Write-Host ""
                 $report.Toolchains | Sort-Object Stack | Format-Table Stack, Available, Command, Version, Detail -AutoSize
                 Write-Host ""
-                $report.Tools | Sort-Object Tool | Format-Table Tool, Stack, Platform, Runnable, Runtime, SmokeCheck, Detail -AutoSize
+                $report.Tools | Sort-Object Tool | Format-Table Tool, Stack, Platform, Runnable, Runtime, SmokePlatform, SmokeRunnable, Detail -AutoSize
             }
         }
 

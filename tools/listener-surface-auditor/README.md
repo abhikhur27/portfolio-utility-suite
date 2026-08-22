@@ -41,6 +41,14 @@ Suppress known-safe development ports so the report emphasizes unexpected exposu
 "C:\Program Files\Go\bin\go.exe" run .\ --ignore-ports 3000,5432,6379 --markdown-out reports\audit.md
 ```
 
+Replay a captured listener surface without reading the current machine:
+
+```bash
+go run . --capture-file fixtures/exposed-development-host.json --include-tcp-stats --json-out artifacts/capture.json --markdown-out artifacts/capture.md
+```
+
+Capture files preserve raw `tasklist /svc /fo csv /nh`, `netstat -ano -p tcp`, and optional `netstat -s -p tcp` output plus a host and RFC 3339 capture time. This mode is useful for regression tests, support handoffs, and reviewing a Windows capture from another operating system. It does not execute the captured text.
+
 ## Output
 
 - Console summary with exposure breakdown and top-risk listeners
@@ -48,12 +56,14 @@ Suppress known-safe development ports so the report emphasizes unexpected exposu
 - Optional suppression of known ports that are expected on the local machine
 - Optional JSON report for scripting or archive history
 - Optional Markdown brief for a quick manual review pass
+- Deterministic offline analysis of saved command captures
 
 ## Verification
 
 ```bash
 "C:\Program Files\Go\bin\go.exe" build .\
-"C:\Program Files\Go\bin\go.exe" run .\ --json-out reports\self-check.json --markdown-out reports\self-check.md
+"C:\Program Files\Go\bin\go.exe" test .\...
+"C:\Program Files\Go\bin\go.exe" run .\ --capture-file fixtures\exposed-development-host.json --include-tcp-stats --ignore-ports 445 --json-out artifacts\self-check.json --markdown-out artifacts\self-check.md
 ```
 
 ## Portfolio Positioning

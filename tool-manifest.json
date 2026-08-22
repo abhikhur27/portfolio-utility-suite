@@ -81,7 +81,8 @@
     "stack": "dotnet",
     "path": "tools/focus-window-audit",
     "entrypoint": "dotnet run --",
-    "smoke": { "arguments": ["--demo"], "description": "Render the deterministic focus-session demo." }
+    "platform": "windows",
+    "smoke": { "arguments": ["--demo"], "description": "Render the deterministic focus-session demo.", "platform": "all" }
   },
   {
     "name": "folder-triage-cli",
@@ -95,7 +96,8 @@
     "stack": "go",
     "path": "tools/listener-surface-auditor",
     "entrypoint": "go run .",
-    "smoke": { "arguments": ["--ignore-ports", "65535"], "description": "Inspect the local listener surface without writing reports." }
+    "platform": "windows",
+    "smoke": { "arguments": ["--capture-file", "fixtures/exposed-development-host.json", "--include-tcp-stats", "--ignore-ports", "445", "--json-out", "artifacts/smoke.json", "--markdown-out", "artifacts/smoke.md"], "description": "Build reports from a deterministic captured Windows listener surface.", "platform": "all" }
   },
   {
     "name": "log-window-extractor",
@@ -116,6 +118,7 @@
     "stack": "powershell",
     "path": "tools/path-shadow-auditor",
     "entrypoint": "powershell -ExecutionPolicy Bypass -File path-shadow-auditor.ps1",
+    "platform": "windows",
     "smoke": { "arguments": ["-Command", "python,git,node", "-Scope", "Process"], "description": "Audit three core commands against the current process PATH." }
   },
   {
@@ -144,6 +147,7 @@
     "stack": "powershell",
     "path": "tools/shortcut-target-auditor",
     "entrypoint": "powershell -ExecutionPolicy Bypass -File shortcut-target-auditor.ps1",
+    "platform": "windows",
     "smoke": { "arguments": ["-Roots", "."], "description": "Exercise shortcut discovery against the tool directory." }
   },
   {

@@ -1,5 +1,9 @@
 param(
     [string]$Tool,
+    [ValidateSet("python", "node", "rust", "dotnet", "go", "java", "powershell", "cpp")]
+    [string]$Stack,
+    [ValidateSet("host", "portable", "windows")]
+    [string]$Shard = "host",
     [ValidateSet("build", "smoke")]
     [string]$Mode = "build"
 )
@@ -15,6 +19,26 @@ if ($Tool) {
     if (-not $manifest) {
         throw "Unknown tool '$Tool'"
     }
+}
+
+if ($Stack) {
+    $manifest = @($manifest | Where-Object { $_.stack -eq $Stack })
+}
+
+if ($Shard -ne "host") {
+    $targetPlatform = if ($Shard -eq "portable") { "all" } else { "windows" }
+    $manifest = @($manifest | Where-Object {
+        $checkPlatform = if ($Mode -eq "smoke") {
+            Get-SuiteSmokePlatform -Record $_
+        } else {
+            Get-SuiteToolPlatform -Record $_
+        }
+        $checkPlatform -eq $targetPlatform
+    })
+}
+
+if (@($manifest).Count -eq 0) {
+    throw "No tools matched the requested check filters (tool='$Tool', stack='$Stack', shard='$Shard', mode='$Mode')."
 }
 
 function Invoke-LoggedCommand {
@@ -70,12 +94,22 @@ foreach ($toolRecord in $manifest) {
         continue
     }
 
-    if (-not (Test-SuitePlatformSupport -Record $toolRecord)) {
+    $platformSupported = if ($Mode -eq "smoke") {
+        Test-SuiteSmokePlatformSupport -Record $toolRecord
+    } else {
+        Test-SuitePlatformSupport -Record $toolRecord
+    }
+    if (-not $platformSupported) {
+        $requiredPlatform = if ($Mode -eq "smoke") {
+            Get-SuiteSmokePlatform -Record $toolRecord
+        } else {
+            Get-SuiteToolPlatform -Record $toolRecord
+        }
         $results.Add([pscustomobject]@{
             Tool = $toolRecord.name
             Stack = $toolRecord.stack
             Status = "SKIP"
-            Detail = "Platform '$($toolRecord.platform)' is not available on this host"
+            Detail = "Platform '$requiredPlatform' is not available on this host"
         })
         continue
     }
@@ -87,7 +121,7 @@ foreach ($toolRecord in $manifest) {
             $arguments = @($toolRecord.smoke.arguments | ForEach-Object { [string]$_ })
             Write-Host "[$($toolRecord.name)] smoke: $($toolRecord.smoke.description)"
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-            Invoke-SuiteTool -Record $toolRecord -RepoRoot $repoRoot -Arguments $arguments
+            Invoke-SuiteTool -Record $toolRecord -RepoRoot $repoRoot -Arguments $arguments -SmokeCheck
             $stopwatch.Stop()
             $detail = "Runtime smoke passed in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s"
         } else {
@@ -100,7 +134,15 @@ foreach ($toolRecord in $manifest) {
                         throw "py_compile failed for $($file.Name)"
                     }
                 }
-                $detail = "Compiled $($pythonFiles.Count) Python file(s)"
+                $testFiles = @(Get-ChildItem -Path $toolPath -Filter "test*.py" -File -Recurse)
+                $testDirectories = @($testFiles | ForEach-Object { $_.DirectoryName } | Sort-Object -Unique)
+                foreach ($testDirectory in $testDirectories) {
+                    $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath "python" -Arguments @("-m", "unittest", "discover", "-s", $testDirectory, "-p", "test*.py") -WorkingDirectory $toolPath
+                    if ($exitCode -ne 0) {
+                        throw "Python unittest discovery failed"
+                    }
+                }
+                $detail = "Compiled $($pythonFiles.Count) Python file(s); ran $($testFiles.Count) test file(s)"
             }
             "node" {
                 $packageJson = Join-Path $toolPath "package.json"
@@ -131,11 +173,11 @@ foreach ($toolRecord in $manifest) {
                 }
             }
             "rust" {
-                $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath "cargo" -Arguments @("check") -WorkingDirectory $toolPath
+                $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath "cargo" -Arguments @("test") -WorkingDirectory $toolPath
                 if ($exitCode -ne 0) {
-                    throw "cargo check failed"
+                    throw "cargo test failed"
                 }
-                $detail = "cargo check passed"
+                $detail = "cargo test passed"
             }
             "dotnet" {
                 $project = Get-ChildItem -Path $toolPath -Filter *.csproj -File | Select-Object -First 1
@@ -160,11 +202,15 @@ foreach ($toolRecord in $manifest) {
                 $detail = "PowerShell parse passed"
             }
             "go" {
+                $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath "go" -Arguments @("test", "./...") -WorkingDirectory $toolPath
+                if ($exitCode -ne 0) {
+                    throw "go test failed"
+                }
                 $exitCode = Invoke-LoggedCommand -Label $toolRecord.name -FilePath "go" -Arguments @("build", ".") -WorkingDirectory $toolPath
                 if ($exitCode -ne 0) {
                     throw "go build failed"
                 }
-                $detail = "go build passed"
+                $detail = "go test and build passed"
             }
             "java" {
                 $source = Join-Path $toolPath "src\DatasetSplitAuditor.java"

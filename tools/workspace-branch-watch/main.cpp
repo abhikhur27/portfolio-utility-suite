@@ -88,6 +88,14 @@ bool commandSucceeds(const std::string& command) {
   return exitCode == 0;
 }
 
+std::string suppressStderr(const std::string& command) {
+#ifdef _WIN32
+  return command + " 2>nul";
+#else
+  return command + " 2>/dev/null";
+#endif
+}
+
 void printUsage() {
   std::cout
       << "Workspace Branch Watch\n"
@@ -163,7 +171,7 @@ std::vector<fs::path> discoverRepos(const Options& options) {
 }
 
 std::string gitOutput(const fs::path& repo, const std::string& args) {
-  return runCommand("git -C " + quotePath(repo) + " " + args + " 2>nul");
+  return runCommand(suppressStderr("git -C " + quotePath(repo) + " " + args));
 }
 
 std::optional<std::string> gitOutputIfOk(const fs::path& repo, const std::string& args) {
@@ -171,7 +179,7 @@ std::optional<std::string> gitOutputIfOk(const fs::path& repo, const std::string
   if (!commandSucceeds(command)) {
     return std::nullopt;
   }
-  return runCommand(command + " 2>nul");
+  return runCommand(suppressStderr(command));
 }
 
 int countStatusRows(const std::string& porcelain, bool untracked) {

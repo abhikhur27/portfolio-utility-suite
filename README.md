@@ -82,6 +82,15 @@ powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode sm
 
 Smoke commands are declared as argument arrays in `tool-manifest.json`; the checker always dispatches them through the same stack-aware runner used by `suite.ps1 -Action run`. This keeps verification aligned with the actual user path and avoids shell-evaluated command strings. Windows-only checks are identified in the manifest and skipped on unsupported hosts.
 
+Product platform support and smoke-test platform support are tracked separately. A Windows utility can therefore keep honest runtime labeling while a deterministic capture or demo exercises its analysis path on Linux CI. Checks can also be narrowed to the same stack/platform shards used in CI:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode smoke -CheckShard portable -Stack go
+powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode build -CheckShard windows -Stack dotnet
+```
+
+GitHub Actions runs portable stack shards on Ubuntu, portable Windows-fixture smokes for Go and .NET, and live Windows product shards on Windows. Build contracts run checked-in Python, Node.js, Rust, and Go tests in addition to compilation.
+
 Inspect environment readiness across every stack in the suite:
 
 ```powershell
@@ -93,8 +102,8 @@ The doctor report is useful before onboarding to the repo on a new machine becau
 
 ## Near-Term Consolidation Plan
 
-1. Add CI shards for the portable smoke checks without forcing Windows-only utilities onto unsupported runners.
-2. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
+1. Normalize README sections so each utility has the same install, run, sample data, and verification shape.
+2. Add deterministic capture modes to the remaining host-dependent Windows utilities where captured inputs can faithfully represent the real workflow.
 3. Decide which older standalone repos should stay archived publicly and which should redirect here.
 
 ## Portfolio Positioning

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,15 @@ type options struct {
 	includeTCPStats bool
 	ignorePortsRaw  string
 	ignorePorts     map[int]struct{}
+	captureFile     string
+}
+
+type captureFixture struct {
+	Host       string `json:"host"`
+	CapturedAt string `json:"captured_at"`
+	Tasklist   string `json:"tasklist"`
+	Netstat    string `json:"netstat"`
+	TCPStats   string `json:"tcp_stats"`
 }
 
 type connection struct {
@@ -66,6 +76,7 @@ type processRollup struct {
 type report struct {
 	GeneratedAt       string            `json:"generated_at"`
 	Host              string            `json:"host"`
+	InputMode         string            `json:"input_mode"`
 	ListenerCount     int               `json:"listener_count"`
 	ExposureBreakdown map[string]int    `json:"exposure_breakdown"`
 	Findings          []listenerFinding `json:"findings"`
@@ -79,6 +90,7 @@ func parseFlags() options {
 	flag.StringVar(&opts.markdownOut, "markdown-out", "", "Optional Markdown report path.")
 	flag.BoolVar(&opts.includeTCPStats, "include-tcp-stats", false, "Include netstat -s TCP counters in the report.")
 	flag.StringVar(&opts.ignorePortsRaw, "ignore-ports", "", "Comma-separated local ports to suppress from the audit.")
+	flag.StringVar(&opts.captureFile, "capture-file", "", "Read deterministic tasklist/netstat output from a JSON capture instead of the live host.")
 	flag.Parse()
 	opts.ignorePorts = parsePortSet(opts.ignorePortsRaw)
 	return opts
@@ -93,29 +105,60 @@ func main() {
 
 func run() error {
 	opts := parseFlags()
-	processes, err := loadProcessMap()
-	if err != nil {
-		return err
-	}
+	var processes map[int]processInfo
+	var connections []connection
+	var tcpStats map[string]string
+	var host string
+	var generatedAt string
+	var inputMode string
+	var err error
 
-	connections, err := loadTCPConnections()
-	if err != nil {
-		return err
-	}
-
-	findings := buildFindings(connections, processes, opts.ignorePorts)
-	tcpStats := map[string]string{}
-	if opts.includeTCPStats {
-		tcpStats, err = loadTCPStats()
+	if opts.captureFile != "" {
+		capture, captureErr := loadCaptureFixture(opts.captureFile)
+		if captureErr != nil {
+			return captureErr
+		}
+		processes, err = parseProcessMap(capture.Tasklist)
+		if err != nil {
+			return fmt.Errorf("parse captured tasklist: %w", err)
+		}
+		connections = parseTCPConnections(capture.Netstat)
+		tcpStats = map[string]string{}
+		if opts.includeTCPStats {
+			tcpStats = parseTCPStats(capture.TCPStats)
+		}
+		host = capture.Host
+		generatedAt = capture.CapturedAt
+		inputMode = "capture"
+	} else {
+		if runtime.GOOS != "windows" {
+			return errors.New("live listener capture requires Windows; use --capture-file for portable fixture analysis")
+		}
+		processes, err = loadProcessMap()
 		if err != nil {
 			return err
 		}
+		connections, err = loadTCPConnections()
+		if err != nil {
+			return err
+		}
+		tcpStats = map[string]string{}
+		if opts.includeTCPStats {
+			tcpStats, err = loadTCPStats()
+			if err != nil {
+				return err
+			}
+		}
+		host, _ = os.Hostname()
+		generatedAt = nowISO()
+		inputMode = "live"
 	}
 
-	host, _ := os.Hostname()
+	findings := buildFindings(connections, processes, opts.ignorePorts)
 	rep := report{
-		GeneratedAt:       nowISO(),
+		GeneratedAt:       generatedAt,
 		Host:              host,
+		InputMode:         inputMode,
 		ListenerCount:     len(findings),
 		ExposureBreakdown: buildExposureBreakdown(findings),
 		Findings:          findings,
@@ -143,12 +186,37 @@ func nowISO() string {
 	return time.Now().Format(time.RFC3339)
 }
 
+func loadCaptureFixture(path string) (captureFixture, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return captureFixture{}, fmt.Errorf("read capture file %s: %w", path, err)
+	}
+	var capture captureFixture
+	if err := json.Unmarshal(data, &capture); err != nil {
+		return captureFixture{}, fmt.Errorf("parse capture file %s: %w", path, err)
+	}
+	if strings.TrimSpace(capture.Host) == "" {
+		return captureFixture{}, errors.New("capture file is missing host")
+	}
+	if _, err := time.Parse(time.RFC3339, capture.CapturedAt); err != nil {
+		return captureFixture{}, fmt.Errorf("capture file has invalid captured_at: %w", err)
+	}
+	if strings.TrimSpace(capture.Tasklist) == "" || strings.TrimSpace(capture.Netstat) == "" {
+		return captureFixture{}, errors.New("capture file must include tasklist and netstat output")
+	}
+	return capture, nil
+}
+
 func loadProcessMap() (map[int]processInfo, error) {
 	tasklist, err := runCommand("tasklist", "/svc", "/fo", "csv", "/nh")
 	if err != nil {
 		return nil, err
 	}
 
+	return parseProcessMap(tasklist)
+}
+
+func parseProcessMap(tasklist string) (map[int]processInfo, error) {
 	reader := csv.NewReader(strings.NewReader(tasklist))
 	records, err := reader.ReadAll()
 	if err != nil {
@@ -186,6 +254,10 @@ func loadTCPConnections() ([]connection, error) {
 		return nil, err
 	}
 
+	return parseTCPConnections(output), nil
+}
+
+func parseTCPConnections(output string) []connection {
 	lines := strings.Split(output, "\n")
 	var connections []connection
 	for _, line := range lines {
@@ -227,7 +299,7 @@ func loadTCPConnections() ([]connection, error) {
 		}
 		return connections[i].PID < connections[j].PID
 	})
-	return connections, nil
+	return connections
 }
 
 func loadTCPStats() (map[string]string, error) {
@@ -236,6 +308,10 @@ func loadTCPStats() (map[string]string, error) {
 		return nil, err
 	}
 
+	return parseTCPStats(output), nil
+}
+
+func parseTCPStats(output string) map[string]string {
 	stats := map[string]string{}
 	for _, line := range strings.Split(output, "\n") {
 		clean := strings.TrimSpace(line)
@@ -245,7 +321,7 @@ func loadTCPStats() (map[string]string, error) {
 		parts := strings.SplitN(clean, "=", 2)
 		stats[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 	}
-	return stats, nil
+	return stats
 }
 
 func buildFindings(connections []connection, processes map[int]processInfo, ignorePorts map[int]struct{}) []listenerFinding {
@@ -431,6 +507,7 @@ func writeMarkdown(path string, rep report) error {
 		"# Listener Surface Audit",
 		"",
 		fmt.Sprintf("- Host: `%s`", rep.Host),
+		fmt.Sprintf("- Input mode: `%s`", rep.InputMode),
 		fmt.Sprintf("- Generated: `%s`", rep.GeneratedAt),
 		fmt.Sprintf("- Listening TCP sockets: `%d`", rep.ListenerCount),
 		"",
@@ -490,6 +567,7 @@ func printConsoleSummary(rep report) {
 	fmt.Println("Listener Surface Auditor")
 	fmt.Println("========================")
 	fmt.Printf("Host:                 %s\n", rep.Host)
+	fmt.Printf("Input mode:           %s\n", rep.InputMode)
 	fmt.Printf("Listening TCP ports:  %d\n", rep.ListenerCount)
 	fmt.Println("Exposure breakdown:")
 	keys := make([]string, 0, len(rep.ExposureBreakdown))

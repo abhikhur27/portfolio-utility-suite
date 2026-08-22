@@ -70,6 +70,14 @@ function Test-SuiteManifest {
             if ([string]::IsNullOrWhiteSpace([string]$record.smoke.description)) {
                 $errors.Add("$name smoke metadata is missing a description.")
             }
+            $smokePlatform = if ($record.smoke.PSObject.Properties.Name -contains "platform") {
+                [string]$record.smoke.platform
+            } else {
+                $platform
+            }
+            if ($supportedPlatforms -notcontains $smokePlatform) {
+                $errors.Add("$name uses unsupported smoke platform '$smokePlatform'.")
+            }
         }
     }
 
@@ -78,14 +86,43 @@ function Test-SuiteManifest {
     }
 }
 
+function Test-SuiteHostPlatform {
+    param([string]$Platform)
+
+    if ($Platform -eq "all") {
+        return $true
+    }
+    return $Platform -eq "windows" -and $env:OS -eq "Windows_NT"
+}
+
+function Get-SuiteToolPlatform {
+    param($Record)
+
+    if ($Record.PSObject.Properties.Name -contains "platform") {
+        return [string]$Record.platform
+    }
+    return "all"
+}
+
+function Get-SuiteSmokePlatform {
+    param($Record)
+
+    if ($Record.smoke.PSObject.Properties.Name -contains "platform") {
+        return [string]$Record.smoke.platform
+    }
+    return Get-SuiteToolPlatform -Record $Record
+}
+
 function Test-SuitePlatformSupport {
     param($Record)
 
-    $platform = if ($Record.PSObject.Properties.Name -contains "platform") { [string]$Record.platform } else { "all" }
-    if ($platform -eq "all") {
-        return $true
-    }
-    return $platform -eq "windows" -and $env:OS -eq "Windows_NT"
+    return Test-SuiteHostPlatform -Platform (Get-SuiteToolPlatform -Record $Record)
+}
+
+function Test-SuiteSmokePlatformSupport {
+    param($Record)
+
+    return Test-SuiteHostPlatform -Platform (Get-SuiteSmokePlatform -Record $Record)
 }
 
 function Resolve-SuiteToolArguments {
@@ -138,11 +175,22 @@ function Invoke-SuiteTool {
     param(
         $Record,
         [string]$RepoRoot,
-        [string[]]$Arguments = @()
+        [string[]]$Arguments = @(),
+        [switch]$SmokeCheck
     )
 
-    if (-not (Test-SuitePlatformSupport -Record $Record)) {
-        throw "$($Record.name) only supports platform '$($Record.platform)'."
+    $platformSupported = if ($SmokeCheck) {
+        Test-SuiteSmokePlatformSupport -Record $Record
+    } else {
+        Test-SuitePlatformSupport -Record $Record
+    }
+    if (-not $platformSupported) {
+        $requiredPlatform = if ($SmokeCheck) {
+            Get-SuiteSmokePlatform -Record $Record
+        } else {
+            Get-SuiteToolPlatform -Record $Record
+        }
+        throw "$($Record.name) only supports this operation on platform '$requiredPlatform'."
     }
 
     $toolPath = Join-Path $RepoRoot $Record.path
@@ -417,14 +465,18 @@ function Get-SuiteDoctorReport {
         $toolPath = Join-Path $RepoRoot $tool.path
         $runtime = $stackIndex[$tool.stack]
         $platformSupported = Test-SuitePlatformSupport -Record $tool
+        $smokePlatform = Get-SuiteSmokePlatform -Record $tool
+        $smokePlatformSupported = Test-SuiteSmokePlatformSupport -Record $tool
         [pscustomobject]@{
             Tool = $tool.name
             Stack = $tool.stack
-            Platform = if ($tool.PSObject.Properties.Name -contains "platform") { $tool.platform } else { "all" }
+            Platform = Get-SuiteToolPlatform -Record $tool
             Runnable = [bool]($platformSupported -and $runtime -and $runtime.Available -and (Test-Path $toolPath))
             Runtime = if ($runtime) { $runtime.Command } else { $null }
             ToolPath = $tool.path
             SmokeCheck = if ($tool.PSObject.Properties.Name -contains "smoke") { "configured" } else { "missing" }
+            SmokePlatform = $smokePlatform
+            SmokeRunnable = [bool]($smokePlatformSupported -and $runtime -and $runtime.Available -and (Test-Path $toolPath))
             Detail = if (-not (Test-Path $toolPath)) {
                 "Missing tool path"
             } elseif (-not $platformSupported) {
@@ -477,10 +529,10 @@ function Convert-DoctorReportToMarkdown {
     $lines.Add("")
     $lines.Add("## Tool Readiness")
     $lines.Add("")
-    $lines.Add("| Tool | Stack | Platform | Runnable | Runtime | Smoke check | Detail |")
-    $lines.Add("| --- | --- | --- | --- | --- | --- | --- |")
+    $lines.Add("| Tool | Stack | Platform | Runnable | Runtime | Smoke platform | Smoke runnable | Detail |")
+    $lines.Add("| --- | --- | --- | --- | --- | --- | --- | --- |")
     foreach ($row in $Report.Tools) {
-        $lines.Add("| $($row.Tool) | $($row.Stack) | $($row.Platform) | $(if ($row.Runnable) { 'yes' } else { 'no' }) | $($row.Runtime) | $($row.SmokeCheck) | $($row.Detail) |")
+        $lines.Add("| $($row.Tool) | $($row.Stack) | $($row.Platform) | $(if ($row.Runnable) { 'yes' } else { 'no' }) | $($row.Runtime) | $($row.SmokePlatform) | $(if ($row.SmokeRunnable) { 'yes' } else { 'no' }) | $($row.Detail) |")
     }
 
     return ($lines -join [Environment]::NewLine)

@@ -1,0 +1,101 @@
+name: Suite checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-stacks:
+    name: Portable ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [python, node, rust, java, cpp]
+    steps:
+      - uses: actions/checkout@v7
+      - if: matrix.stack == 'python'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - if: matrix.stack == 'node'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - if: matrix.stack == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+      - if: matrix.stack == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Build portable tools
+        shell: pwsh
+        run: ./suite.ps1 -Action check -CheckMode build -CheckShard portable -Stack ${{ matrix.stack }}
+      - name: Smoke portable tools
+        shell: pwsh
+        run: ./suite.ps1 -Action check -CheckMode smoke -CheckShard portable -Stack ${{ matrix.stack }}
+
+  portable-windows-fixtures:
+    name: Portable ${{ matrix.stack }} Windows fixture
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [go, dotnet]
+    steps:
+      - uses: actions/checkout@v7
+      - if: matrix.stack == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: tools/listener-surface-auditor/go.mod
+          cache: false
+      - if: matrix.stack == 'dotnet'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Smoke deterministic fixture
+        shell: pwsh
+        run: ./suite.ps1 -Action check -CheckMode smoke -CheckShard portable -Stack ${{ matrix.stack }}
+
+  windows-products:
+    name: Windows ${{ matrix.stack }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack: powershell
+            smoke: true
+          - stack: rust
+            smoke: true
+          - stack: dotnet
+            smoke: true
+          - stack: go
+            smoke: false
+    steps:
+      - uses: actions/checkout@v7
+      - if: matrix.stack == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+      - if: matrix.stack == 'dotnet'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - if: matrix.stack == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: tools/listener-surface-auditor/go.mod
+          cache: false
+      - name: Build Windows tools
+        shell: pwsh
+        run: ./suite.ps1 -Action check -CheckMode build -CheckShard windows -Stack ${{ matrix.stack }}
+      - if: matrix.smoke
+        name: Smoke Windows tools
+        shell: pwsh
+        run: ./suite.ps1 -Action check -CheckMode smoke -CheckShard windows -Stack ${{ matrix.stack }}

@@ -1,0 +1,7 @@
+{
+  "host": "fixture-devbox",
+  "captured_at": "2026-08-20T15:30:00-05:00",
+  "tasklist": "\"node.exe\",\"4242\",\"N/A\"\r\n\"postgres.exe\",\"1337\",\"postgresql-x64-17\"\r\n\"System\",\"4\",\"RpcSs,Dnscache\"\r\n",
+  "netstat": "Active Connections\r\n\r\n  Proto  Local Address          Foreign Address        State           PID\r\n  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       4242\r\n  TCP    127.0.0.1:9229         0.0.0.0:0              LISTENING       4242\r\n  TCP    192.168.1.50:5432      0.0.0.0:0              LISTENING       1337\r\n  TCP    [::]:445               [::]:0                 LISTENING       4\r\n  TCP    [::1]:8080             [::]:0                 LISTENING       9999\r\n  TCP    192.168.1.50:51000     142.250.190.78:443     ESTABLISHED     4242\r\n  UDP    0.0.0.0:5353           *:*                                    4242\r\n",
+  "tcp_stats": "TCP Statistics for IPv4\r\n\r\n  Active Opens                        = 42\r\n  Passive Opens                       = 17\r\n  Failed Connection Attempts          = 3\r\n  Current Connections                 = 8\r\n"
+}
