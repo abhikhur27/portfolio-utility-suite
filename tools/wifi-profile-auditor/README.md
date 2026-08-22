@@ -34,6 +34,14 @@ Show only the profiles worth reviewing first:
 cargo run --release -- --min-risk 50
 ```
 
+Replay checked-in or support-provided `netsh` captures without reading the current machine:
+
+```bash
+cargo run --release -- --capture-dir fixtures/exposed-profiles --min-risk 50 --json-out artifacts/capture.json --markdown-out artifacts/capture.md
+```
+
+A capture directory contains the raw `netsh wlan show profiles` result as `profile-list.txt` and one raw profile detail result per network under `profiles/`. This makes risk scoring reproducible in CI and lets a capture be reviewed from a non-Windows machine without executing its contents.
+
 ## Output
 
 - Console summary with authentication breakdown and riskiest saved profiles
@@ -45,8 +53,8 @@ cargo run --release -- --min-risk 50
 
 ```bash
 cargo fmt --check
-cargo check
-cargo run -- --markdown-out reports/self-check.md
+cargo test
+cargo run -- --capture-dir fixtures/exposed-profiles --min-risk 50 --markdown-out artifacts/self-check.md
 ```
 
 ## Portfolio Positioning

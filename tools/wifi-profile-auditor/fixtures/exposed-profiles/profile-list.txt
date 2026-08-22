@@ -1,0 +1,11 @@
+Profiles on interface Wi-Fi:
+
+Group policy profiles (read only)
+---------------------------------
+    <None>
+
+User profiles
+-------------
+    All User Profile     : Campus Guest
+    All User Profile     : Home WPA3
+    All User Profile     : Legacy Lab

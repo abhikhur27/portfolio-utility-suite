@@ -151,6 +151,18 @@ function Resolve-SuiteToolArguments {
     return @($ArgsArray)
 }
 
+function ConvertTo-SuiteArgumentString {
+    param($Value)
+
+    if ($Value -is [datetime]) {
+        return $Value.ToString("o", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    if ($Value -is [datetimeoffset]) {
+        return $Value.ToString("o", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    return [string]$Value
+}
+
 function Get-SuitePythonEntrypoint {
     param($Record, [string]$ToolPath)
 

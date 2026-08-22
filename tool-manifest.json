@@ -184,7 +184,7 @@
     "path": "tools/wifi-profile-auditor",
     "entrypoint": "cargo run --",
     "platform": "windows",
-    "smoke": { "arguments": ["--min-risk", "100"], "description": "Read saved Windows Wi-Fi profiles and apply a high-risk filter." }
+    "smoke": { "arguments": ["--capture-dir", "fixtures/exposed-profiles", "--min-risk", "50", "--json-out", "artifacts/smoke.json", "--markdown-out", "artifacts/smoke.md"], "description": "Audit deterministic captured Windows Wi-Fi profiles and build reports.", "platform": "all" }
   },
   {
     "name": "windows-autostart-auditor",

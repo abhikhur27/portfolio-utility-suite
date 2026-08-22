@@ -1,0 +1,16 @@
+Profile Campus Guest on interface Wi-Fi:
+=======================================================================
+
+Connection settings
+-------------------
+    Connection mode        : Connect automatically
+
+Security settings
+-----------------
+    Authentication         : Open
+    Cipher                 : None
+    Security key           : Absent
+
+Cost settings
+-------------
+    Cost                   : Unrestricted

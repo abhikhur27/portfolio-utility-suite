@@ -1,0 +1,16 @@
+Profile Home WPA3 on interface Wi-Fi:
+=======================================================================
+
+Connection settings
+-------------------
+    Connection mode        : Connect manually
+
+Security settings
+-----------------
+    Authentication         : WPA3-Personal
+    Cipher                 : GCMP-256
+    Security key           : Present
+
+Cost settings
+-------------
+    Cost                   : Fixed

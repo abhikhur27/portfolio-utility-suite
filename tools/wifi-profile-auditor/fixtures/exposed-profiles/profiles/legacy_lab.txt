@@ -1,0 +1,16 @@
+Profile Legacy Lab on interface Wi-Fi:
+=======================================================================
+
+Connection settings
+-------------------
+    Connection mode        : Connect automatically
+
+Security settings
+-----------------
+    Authentication         : WEP
+    Cipher                 : WEP
+    Security key           : Present
+
+Cost settings
+-------------
+    Cost                   : Fixed

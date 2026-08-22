@@ -9,6 +9,7 @@ struct Options {
     json_out: Option<String>,
     markdown_out: Option<String>,
     min_risk: Option<u8>,
+    capture_dir: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ struct WifiProfile {
 
 #[derive(Debug, Clone)]
 struct Report {
+    input_mode: String,
     profile_count: usize,
     automatic_profile_count: usize,
     high_risk_automatic_profile_count: usize,
@@ -42,11 +44,17 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let options = parse_args(env::args().skip(1).collect())?;
-    let names = load_profile_names()?;
-    let mut profiles = Vec::with_capacity(names.len());
-    for name in names {
-        profiles.push(load_profile(&name)?);
-    }
+    let (mut profiles, input_mode) = if let Some(path) = options.capture_dir.as_deref() {
+        (load_profiles_from_capture(path)?, "capture")
+    } else {
+        if !cfg!(target_os = "windows") {
+            return Err(
+                "Live Wi-Fi profile capture requires Windows; use --capture-dir for offline analysis."
+                    .to_string(),
+            );
+        }
+        (load_live_profiles()?, "live")
+    };
     profiles.sort_by(|left, right| {
         right
             .risk_score
@@ -54,7 +62,7 @@ fn run() -> Result<(), String> {
             .then(left.name.cmp(&right.name))
     });
 
-    let report = build_report(profiles);
+    let report = build_report(profiles, input_mode);
     print_console_summary(&report, &options);
 
     if let Some(path) = options.json_out.as_deref() {
@@ -73,6 +81,7 @@ fn parse_args(args: Vec<String>) -> Result<Options, String> {
         json_out: None,
         markdown_out: None,
         min_risk: None,
+        capture_dir: None,
     };
     let mut index = 0;
     while index < args.len() {
@@ -104,6 +113,13 @@ fn parse_args(args: Vec<String>) -> Result<Options, String> {
                 }
                 options.min_risk = Some(parsed);
             }
+            "--capture-dir" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| "Missing value for --capture-dir".to_string())?;
+                options.capture_dir = Some(value.clone());
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -121,16 +137,21 @@ fn print_usage() {
     println!(
         "WiFi Profile Auditor\n\
          Usage:\n\
-           wifi-profile-auditor [--json-out path] [--markdown-out path] [--min-risk score]\n\n\
+           wifi-profile-auditor [--json-out path] [--markdown-out path] [--min-risk score] [--capture-dir path]\n\n\
          Examples:\n\
            wifi-profile-auditor\n\
            wifi-profile-auditor --json-out reports\\wifi.json --markdown-out reports\\wifi.md\n\
-           wifi-profile-auditor --min-risk 50"
+           wifi-profile-auditor --min-risk 50\n\
+           wifi-profile-auditor --capture-dir fixtures/exposed-profiles"
     );
 }
 
 fn load_profile_names() -> Result<Vec<String>, String> {
     let output = run_netsh(&["wlan", "show", "profiles"])?;
+    parse_profile_names(&output)
+}
+
+fn parse_profile_names(output: &str) -> Result<Vec<String>, String> {
     let mut names = Vec::new();
     for line in output.lines() {
         if let Some((key, value)) = split_kv_line(line) {
@@ -152,6 +173,48 @@ fn load_profile_names() -> Result<Vec<String>, String> {
     Ok(names)
 }
 
+fn load_live_profiles() -> Result<Vec<WifiProfile>, String> {
+    let names = load_profile_names()?;
+    let mut profiles = Vec::with_capacity(names.len());
+    for name in names {
+        profiles.push(load_profile(&name)?);
+    }
+    Ok(profiles)
+}
+
+fn load_profiles_from_capture(path: &str) -> Result<Vec<WifiProfile>, String> {
+    let capture_dir = Path::new(path);
+    let list_path = capture_dir.join("profile-list.txt");
+    let list_output = fs::read_to_string(&list_path)
+        .map_err(|error| format!("Unable to read {}: {error}", list_path.display()))?;
+    let names = parse_profile_names(&list_output)?;
+    let mut profiles = Vec::with_capacity(names.len());
+    for name in names {
+        let profile_path = capture_dir
+            .join("profiles")
+            .join(format!("{}.txt", capture_profile_slug(&name)));
+        let output = fs::read_to_string(&profile_path)
+            .map_err(|error| format!("Unable to read {}: {error}", profile_path.display()))?;
+        profiles.push(parse_profile(&name, &output)?);
+    }
+    Ok(profiles)
+}
+
+fn capture_profile_slug(name: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_separator = false;
+    for character in name.chars() {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character.to_ascii_lowercase());
+            previous_separator = false;
+        } else if !previous_separator && !slug.is_empty() {
+            slug.push('_');
+            previous_separator = true;
+        }
+    }
+    slug.trim_matches('_').to_string()
+}
+
 fn load_profile(name: &str) -> Result<WifiProfile, String> {
     let output = run_netsh(&[
         "wlan",
@@ -160,14 +223,18 @@ fn load_profile(name: &str) -> Result<WifiProfile, String> {
         &format!("name={name}"),
         "key=clear",
     ])?;
-    let authentication = extract_field(&output, &["Authentication", "Auth"])?
+    parse_profile(name, &output)
+}
+
+fn parse_profile(name: &str, output: &str) -> Result<WifiProfile, String> {
+    let authentication = extract_field(output, &["Authentication", "Auth"])?
         .unwrap_or_else(|| "Unknown".to_string());
-    let cipher = extract_field(&output, &["Cipher"])?.unwrap_or_else(|| "Unknown".to_string());
-    let connection_mode = extract_field(&output, &["Connection mode", "Connection Mode"])?
+    let cipher = extract_field(output, &["Cipher"])?.unwrap_or_else(|| "Unknown".to_string());
+    let connection_mode = extract_field(output, &["Connection mode", "Connection Mode"])?
         .unwrap_or_else(|| "Unknown".to_string());
-    let cost = extract_field(&output, &["Cost settings", "Cost"])?
-        .unwrap_or_else(|| "Unknown".to_string());
-    let security_key_present = extract_field(&output, &["Security key", "Security key present"])?
+    let cost =
+        extract_field(output, &["Cost settings", "Cost"])?.unwrap_or_else(|| "Unknown".to_string());
+    let security_key_present = extract_field(output, &["Security key", "Security key present"])?
         .unwrap_or_else(|| "Unknown".to_string());
     let (risk_score, risk_label, recommendation) = score_profile(
         &authentication,
@@ -290,7 +357,7 @@ fn score_profile(
     (score.min(100), label, recommendation)
 }
 
-fn build_report(profiles: Vec<WifiProfile>) -> Report {
+fn build_report(profiles: Vec<WifiProfile>, input_mode: &str) -> Report {
     let mut authentication_breakdown = BTreeMap::new();
     let automatic_profile_count = profiles
         .iter()
@@ -315,6 +382,7 @@ fn build_report(profiles: Vec<WifiProfile>) -> Report {
             .or_insert(0) += 1;
     }
     Report {
+        input_mode: input_mode.to_string(),
         profile_count: profiles.len(),
         automatic_profile_count,
         high_risk_automatic_profile_count,
@@ -326,6 +394,7 @@ fn build_report(profiles: Vec<WifiProfile>) -> Report {
 fn print_console_summary(report: &Report, options: &Options) {
     println!("WiFi Profile Auditor");
     println!("====================");
+    println!("Input mode: {}", report.input_mode);
     println!("Saved profiles: {}", report.profile_count);
     println!("Auto-connect profiles: {}", report.automatic_profile_count);
     println!(
@@ -366,6 +435,10 @@ fn print_console_summary(report: &Report, options: &Options) {
 fn write_json(path: &str, report: &Report) -> Result<(), String> {
     let mut lines = Vec::new();
     lines.push("{".to_string());
+    lines.push(format!(
+        "  \"input_mode\": \"{}\",",
+        json_escape(&report.input_mode)
+    ));
     lines.push(format!("  \"profile_count\": {},", report.profile_count));
     lines.push(format!(
         "  \"automatic_profile_count\": {},",
@@ -439,6 +512,7 @@ fn write_markdown(path: &str, report: &Report) -> Result<(), String> {
     let mut lines = Vec::new();
     lines.push("# WiFi Profile Audit".to_string());
     lines.push(String::new());
+    lines.push(format!("- Input mode: `{}`", report.input_mode));
     lines.push(format!("- Saved profiles: `{}`", report.profile_count));
     lines.push(format!(
         "- Auto-connect profiles: `{}`",
@@ -519,4 +593,50 @@ fn run_netsh(args: &[&str]) -> Result<String, String> {
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn captured_profiles_produce_stable_risk_posture() {
+        let mut profiles = load_profiles_from_capture("fixtures/exposed-profiles").unwrap();
+        profiles.sort_by(|left, right| {
+            right
+                .risk_score
+                .cmp(&left.risk_score)
+                .then(left.name.cmp(&right.name))
+        });
+        let report = build_report(profiles, "capture");
+
+        assert_eq!(report.input_mode, "capture");
+        assert_eq!(report.profile_count, 3);
+        assert_eq!(report.automatic_profile_count, 2);
+        assert_eq!(report.high_risk_automatic_profile_count, 2);
+        assert_eq!(report.authentication_breakdown["Open"], 1);
+        assert_eq!(report.authentication_breakdown["WEP"], 1);
+        assert_eq!(report.authentication_breakdown["WPA3-Personal"], 1);
+        assert_eq!(report.profiles[0].name, "Campus Guest");
+        assert_eq!(report.profiles[0].risk_score, 100);
+        assert_eq!(report.profiles[1].name, "Legacy Lab");
+        assert_eq!(report.profiles[1].risk_score, 88);
+        assert_eq!(report.profiles[2].name, "Home WPA3");
+        assert_eq!(report.profiles[2].risk_score, 10);
+    }
+
+    #[test]
+    fn capture_filename_slug_is_portable_and_stable() {
+        assert_eq!(capture_profile_slug("Campus Guest"), "campus_guest");
+        assert_eq!(capture_profile_slug("  Lab / WPA2  "), "lab_wpa2");
+    }
+
+    #[test]
+    fn profile_list_parser_deduplicates_names() {
+        let output = "All User Profile : Campus Guest\nUser Profile : Campus Guest\nAll User Profile : Home WPA3\n";
+        assert_eq!(
+            parse_profile_names(output).unwrap(),
+            vec!["Campus Guest".to_string(), "Home WPA3".to_string()]
+        );
+    }
 }

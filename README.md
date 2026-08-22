@@ -69,6 +69,7 @@ powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action run -Tool trace-bud
 Check the whole suite or one tool:
 
 ```powershell
+python -m pip install --requirement .\requirements.txt
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -Tool deadline-calendar-builder
 ```
@@ -89,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode sm
 powershell -ExecutionPolicy Bypass -File .\suite.ps1 -Action check -CheckMode build -CheckShard windows -Stack dotnet
 ```
 
-GitHub Actions runs portable stack shards on Ubuntu, portable Windows-fixture smokes for Go and .NET, and live Windows product shards on Windows. Build contracts run checked-in Python, Node.js, Rust, and Go tests in addition to compilation.
+GitHub Actions runs portable stack shards on Ubuntu, deterministic Windows-capture/demo smokes for Go, Rust, and .NET, and Windows product build/smoke shards on Windows. Build contracts run checked-in Python, Node.js, Rust, and Go tests in addition to compilation.
 
 Inspect environment readiness across every stack in the suite:
 

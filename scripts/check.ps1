@@ -118,7 +118,7 @@ foreach ($toolRecord in $manifest) {
         $status = "PASS"
         $detail = $null
         if ($Mode -eq "smoke") {
-            $arguments = @($toolRecord.smoke.arguments | ForEach-Object { [string]$_ })
+            $arguments = @($toolRecord.smoke.arguments | ForEach-Object { ConvertTo-SuiteArgumentString -Value $_ })
             Write-Host "[$($toolRecord.name)] smoke: $($toolRecord.smoke.description)"
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
             Invoke-SuiteTool -Record $toolRecord -RepoRoot $repoRoot -Arguments $arguments -SmokeCheck
