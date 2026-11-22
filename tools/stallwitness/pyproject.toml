@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stallwitness"
+version = "0.1.0"
+description = "Offline ready/valid trace checking with short failure witnesses"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.scripts]
+stallwitness = "stallwitness.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["stallwitness*"]
