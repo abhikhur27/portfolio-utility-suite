@@ -1,0 +1,23 @@
+name: Check temporal decision replay
+on:
+  push:
+    paths: ["tools/afterfact/**", ".github/workflows/afterfact.yml"]
+  pull_request:
+    paths: ["tools/afterfact/**", ".github/workflows/afterfact.yml"]
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/afterfact
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -v
+      - run: python main.py demo --out build/demo
+      - run: python main.py replay examples/events.json --valid-at 50 --before 50 --after 100 --db build/facts.sqlite --out build/replay
+
