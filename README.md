@@ -4,10 +4,21 @@ One consolidated repo for the small practical CLI utilities that used to live as
 
 The point of this repo is focus: improve installability, shared testing, shared documentation, and real workflows here instead of creating more tiny one-off projects.
 
+## Packet and waveform tools
+
+Two self-contained tools have their own setup, tests, examples, and limitations:
+
+- [StallWitness](tools/stallwitness): check saved ready/valid waveforms, find short failure witnesses, and compare accepted transactions across RTL runs. Includes a real SystemVerilog FIFO and seeded Icarus fault-injection evaluation.
+- [RuleSplit](tools/rulesplit): compile an ordered IPv4 policy into a bounded prefix-table split, check decision equivalence, and replay synthetic PCAPs through Python and compiled C classifiers.
+
+These run locally without API keys or device access. The packet-tools workflow checks their full documented paths on Linux; neither project claims physical silicon or DPU testing.
+
 ## Tool Catalog
 
 | Tool | Stack | Purpose |
 | --- | --- | --- |
+| `stallwitness` | Python, SystemVerilog | Extract ready/valid failure witnesses and compare RTL transaction traces. |
+| `rulesplit` | Python, C | Check an ordered ACL's CPU/offload split using exact packet-space coverage and PCAP replay. |
 | `bookmark-health-brief` | Python | Audit browser bookmark exports for duplicates, risky schemes, empty folders, and optional broken-link checks. |
 | `build-failure-brief` | Python | Turn noisy compiler and test logs into grouped failure summaries. |
 | `calendar-conflict-scout` | Rust | Scan `.ics` calendars for overlaps, tight turnarounds, and free windows. |
