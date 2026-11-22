@@ -457,5 +457,17 @@
       ],
       "description": "Load the checked packet-policy compiler CLI. PCAP/C replay is exercised by packet-tools CI."
     }
+  },
+  {
+    "name": "afterfact",
+    "stack": "python",
+    "path": "tools/afterfact",
+    "entrypoint": "python main.py",
+    "smoke": {
+      "arguments": [
+        "--help"
+      ],
+      "description": "Load the temporal decision-replay CLI. Exact matching and persistent replay are exercised by afterfact CI."
+    }
   }
 ]
