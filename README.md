@@ -4,7 +4,10 @@ One consolidated repo for the small practical CLI utilities that used to live as
 
 The point of this repo is focus: improve installability, shared testing, shared documentation, and real workflows here instead of creating more tiny one-off projects.
 
-## Packet and waveform tools
+## Replay, packet and waveform tools
+
+[AfterFact](tools/afterfact) replays operational assignments across effective and knowledge time, then isolates the late corrections that reproduce a changed decision. It includes an atomic SQLite journal, exact bounded matching, an independent exhaustive oracle, and an offline source-linked report.
+
 
 Two self-contained tools have their own setup, tests, examples, and limitations:
 
