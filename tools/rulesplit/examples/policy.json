@@ -1,0 +1,10 @@
+{
+  "default":"drop",
+  "rules":[
+    {"id":"trusted-api","action":"allow","src":"10.0.0.0/8","dst":"172.16.0.0/16","dport":443},
+    {"id":"external-api","action":"drop","dst":"172.16.0.0/16","dport":443},
+    {"id":"dns","action":"allow","proto":"udp","dport":53},
+    {"id":"ssh","action":"drop","dport":22},
+    {"id":"public-web","action":"allow","dst":"192.0.2.0/24","dport":443}
+  ]
+}
